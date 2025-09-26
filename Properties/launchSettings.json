@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Minefield": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
