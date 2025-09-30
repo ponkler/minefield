@@ -416,3 +416,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+/minefield.db
+/minefield.db-shm
+/minefield.db-wal

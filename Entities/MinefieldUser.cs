@@ -4,8 +4,10 @@
     {
         public ulong ServerId { get; set; }
         public ulong UserId { get; set; }
+        public string Username { get; set; } = null!;
 
         public int CurrentOdds { get; set; } = 50;
+        public int MaxOdds { get; set; } = 50;
         public int CurrentStreak { get; set; } = 0;
         public int Currency { get; set; } = 0;
         public int LifetimeCurrency { get; set; } = 0;
@@ -15,16 +17,21 @@
 
         // PERKS ACTIVE
         public int AegisCharges { get; set; } = 0;
-        public int MessagesSinceAegis { get; set; } = 20;
+        public int MessagesSinceAegis { get; set; } = 15;
 
         public int LifelineCharges { get; set; } = 0;
 
         public int SymbioteCharges { get; set; } = 0;
 
-        public int LuckCharges { get; set; } = 0;
+        public int FortuneCharges { get; set; } = 0;
 
         public bool HasGuardian { get; set; } = false;
-        public int MessagesSinceGuardian { get; set; } = 30;
+        public int MessagesSinceGuardian { get; set; } = 15;
+
+        // DEATH PACT CONNECTION
+        public ulong? DeathPactTargetId { get; set; }
+        public ulong? DeathPactTargetServerId { get; set; }
+        public MinefieldUser? DeathPactTarget { get; set; }
 
         // LIFELINE CONNECTION
         public ulong? LifelineTargetId { get; set; }

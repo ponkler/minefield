@@ -36,6 +36,18 @@ namespace Minefield.Data.Migrations
                     b.Property<int>("CurrentStreak")
                         .HasColumnType("INTEGER");
 
+                    b.Property<ulong?>("DeathPactTargetId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong?>("DeathPactTargetServerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong?>("DeathPactTargetUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FortuneCharges")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("HasGuardian")
                         .HasColumnType("INTEGER");
 
@@ -60,7 +72,7 @@ namespace Minefield.Data.Migrations
                     b.Property<int>("LifetimeCurrency")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("LuckCharges")
+                    b.Property<int>("MaxOdds")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("MessagesSinceAegis")
@@ -99,7 +111,13 @@ namespace Minefield.Data.Migrations
                     b.Property<int>("TotalMessages")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("UserId", "ServerId");
+
+                    b.HasIndex("DeathPactTargetUserId", "DeathPactTargetServerId");
 
                     b.HasIndex("LifelineTargetId", "LifelineTargetServerId")
                         .IsUnique();
@@ -115,6 +133,10 @@ namespace Minefield.Data.Migrations
 
             modelBuilder.Entity("Minefield.Entities.MinefieldUser", b =>
                 {
+                    b.HasOne("Minefield.Entities.MinefieldUser", "DeathPactTarget")
+                        .WithMany()
+                        .HasForeignKey("DeathPactTargetUserId", "DeathPactTargetServerId");
+
                     b.HasOne("Minefield.Entities.MinefieldUser", "LifelineTarget")
                         .WithOne("LifelineProvider")
                         .HasForeignKey("Minefield.Entities.MinefieldUser", "LifelineTargetId", "LifelineTargetServerId")
@@ -129,6 +151,8 @@ namespace Minefield.Data.Migrations
                         .WithOne("SymbioteProvider")
                         .HasForeignKey("Minefield.Entities.MinefieldUser", "SymbioteTargetId", "SymbioteTargetServerId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("DeathPactTarget");
 
                     b.Navigation("LifelineTarget");
 

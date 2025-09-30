@@ -2,6 +2,7 @@
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using Minefield.Entities;
+using System.Collections.Generic;
 
 namespace Minefield.Services
 {
@@ -30,6 +31,7 @@ namespace Minefield.Services
             _userService = userService;
 
             _minefieldService.UserRevived += HandleUserReviveAsync;
+            _minefieldService.ArenaStarted += OnArenaStarted;
 
             _client.MessageCreated += OnMessageCreatedAsync;
             _client.MessageCreated += async (c, e) =>
@@ -46,11 +48,37 @@ namespace Minefield.Services
                 await Task.CompletedTask;
             };
 
-            _client.Ready += (c, a) =>
+            _client.Ready += async (c, a) =>
             {
+                int memberCount = 0;
+                int serverCount = 0;
+
                 Console.WriteLine($"Bot connected as {_client.CurrentUser.Username}");
-                return Task.CompletedTask;
+                Console.WriteLine($"Populating...");
+                foreach (var kv in _client.Guilds)
+                {
+                    var memberList = (await kv.Value.GetAllMembersAsync()).ToList();
+                    serverCount++;
+
+                    memberCount += await PopulateServer(memberList);
+                }
+
+                Console.WriteLine($"Found {memberCount:N0} members across {serverCount:N0} servers.");
             };
+        }
+
+        private async Task<int> PopulateServer(List<DiscordMember> members)
+        {
+            int count = 0;
+
+            foreach (var member in members) 
+            {
+                if (member.IsBot) continue;
+                count++;
+                await _userService.GetOrCreateUserAsync(member.Id, member.Guild.Id, member.Username);
+            }
+
+            return count;
         }
 
         private async Task OnMessageCreatedAsync(DiscordClient sender, MessageCreateEventArgs e)
@@ -62,17 +90,11 @@ namespace Minefield.Services
                 await _commandService.HandleCommandAsync(sender, e);
             else
             {
-                var user = await _userService.GetOrCreateUserAsync(e.Author.Id, e.Guild.Id);
+                var user = await _userService.GetOrCreateUserAsync(e.Author.Id, e.Guild.Id, e.Author.Username);
                 RollResult result = await _minefieldService.ProcessMessageAsync(user);
 
                 if (result.Roll == 0)
                 {
-                    return;
-                }
-
-                if (result.GuardianUsed)
-                {
-                    await e.Message.RespondAsync(":angel::boom::angel:");
                     return;
                 }
 
@@ -95,10 +117,15 @@ namespace Minefield.Services
                     else
                     {
                         deadUser.IsAlive = false;
+                        if (deadUser.DeathPactTarget != null)
+                        {
+                            deadUser.DeathPactTarget.IsAlive = false;
+                            await e.Message.RespondAsync($":scroll: {deadUser.DeathPactTarget.Username} has been claimed by their Death Pact with {deadUser.Username} :scroll:");
+                            await HandleUserDeathAsync(deadUser.DeathPactTarget);
+                        }
                         await HandleUserDeathAsync(deadUser);
                         await e.Message.RespondAsync(":boom:");
                     }
-
                     return;
                 }
 
@@ -152,6 +179,51 @@ namespace Minefield.Services
 
             await channel.DeleteOverwriteAsync(member);
             await _userService.SaveAsync();
+        }
+
+        private async Task OnArenaStarted(Arena arena)
+        {
+            var channel = await GetMinefieldChannelAsync(arena.Participants.First().ServerId);
+            await _commandService.SendArenaParticipantsEmbedAsync(_client, channel!, arena.Participants, arena.Payout);
+            await Task.Delay(3000);
+
+            List<MinefieldUser> winners = new List<MinefieldUser>();
+
+            List<MinefieldUser> survivors = arena.Participants;
+
+            Dictionary<MinefieldUser, int> participantRolls = new Dictionary<MinefieldUser, int>();
+
+            int round = 1;
+
+            while (winners.Count == 0)
+            {
+                foreach (var user in survivors)
+                {
+                    participantRolls[user] = _minefieldService.RollArenaRound();
+                }
+
+                if (participantRolls.All(pr => pr.Value == 5))
+                {
+                    winners = participantRolls.Keys.ToList();
+                }
+
+                survivors = participantRolls.Where(pr => pr.Value != 5)
+                    .Select(pr => pr.Key)
+                    .ToList();
+
+                if (survivors.Count == 1)
+                {
+                    winners.Add(survivors.First());
+                }
+
+                await _commandService.SendArenaRoundEmbedAsync(_client, channel!, participantRolls, round);
+                round++;
+                await Task.Delay(3000);
+            }
+
+            await _minefieldService.ResolveArenaAsync(winners);
+            await _commandService.SendArenaResolveEmbedAsync(_client, channel!, winners, arena.Payout);
+            return;
         }
     }
 }

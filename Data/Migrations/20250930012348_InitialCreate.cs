@@ -16,7 +16,9 @@ namespace Minefield.Data.Migrations
                 {
                     ServerId = table.Column<ulong>(type: "INTEGER", nullable: false),
                     UserId = table.Column<ulong>(type: "INTEGER", nullable: false),
+                    Username = table.Column<string>(type: "TEXT", nullable: false),
                     CurrentOdds = table.Column<int>(type: "INTEGER", nullable: false),
+                    MaxOdds = table.Column<int>(type: "INTEGER", nullable: false),
                     CurrentStreak = table.Column<int>(type: "INTEGER", nullable: false),
                     Currency = table.Column<int>(type: "INTEGER", nullable: false),
                     LifetimeCurrency = table.Column<int>(type: "INTEGER", nullable: false),
@@ -26,9 +28,12 @@ namespace Minefield.Data.Migrations
                     MessagesSinceAegis = table.Column<int>(type: "INTEGER", nullable: false),
                     LifelineCharges = table.Column<int>(type: "INTEGER", nullable: false),
                     SymbioteCharges = table.Column<int>(type: "INTEGER", nullable: false),
-                    LuckCharges = table.Column<int>(type: "INTEGER", nullable: false),
+                    FortuneCharges = table.Column<int>(type: "INTEGER", nullable: false),
                     HasGuardian = table.Column<bool>(type: "INTEGER", nullable: false),
                     MessagesSinceGuardian = table.Column<int>(type: "INTEGER", nullable: false),
+                    DeathPactTargetId = table.Column<ulong>(type: "INTEGER", nullable: true),
+                    DeathPactTargetServerId = table.Column<ulong>(type: "INTEGER", nullable: true),
+                    DeathPactTargetUserId = table.Column<ulong>(type: "INTEGER", nullable: true),
                     LifelineTargetId = table.Column<ulong>(type: "INTEGER", nullable: true),
                     LifelineTargetServerId = table.Column<ulong>(type: "INTEGER", nullable: true),
                     LifelineProviderId = table.Column<ulong>(type: "INTEGER", nullable: true),
@@ -45,6 +50,11 @@ namespace Minefield.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Users", x => new { x.UserId, x.ServerId });
+                    table.ForeignKey(
+                        name: "FK_Users_Users_DeathPactTargetUserId_DeathPactTargetServerId",
+                        columns: x => new { x.DeathPactTargetUserId, x.DeathPactTargetServerId },
+                        principalTable: "Users",
+                        principalColumns: new[] { "UserId", "ServerId" });
                     table.ForeignKey(
                         name: "FK_Users_Users_LifelineTargetId_LifelineTargetServerId",
                         columns: x => new { x.LifelineTargetId, x.LifelineTargetServerId },
@@ -64,6 +74,11 @@ namespace Minefield.Data.Migrations
                         principalColumns: new[] { "UserId", "ServerId" },
                         onDelete: ReferentialAction.Restrict);
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_DeathPactTargetUserId_DeathPactTargetServerId",
+                table: "Users",
+                columns: new[] { "DeathPactTargetUserId", "DeathPactTargetServerId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_LifelineTargetId_LifelineTargetServerId",
