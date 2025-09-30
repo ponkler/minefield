@@ -233,6 +233,7 @@ namespace Minefield.Services
 
             user.Currency -= perkCosts["restore"] * amount;
             user.MaxOdds += amount;
+            user.CurrentOdds += amount;
 
             await _userService.SaveAsync();
             return true;

@@ -14,12 +14,12 @@ namespace MinefieldDev
         static async Task Main(string[] args)
         {
             var services = new ServiceCollection();
-            /*
+
             var root = Directory.GetCurrentDirectory();
             var dotenv = Path.Combine(root, ".env");
 
             DotEnv.Load(dotenv);
-            */
+
             services.AddDbContext<MinefieldDbContext>(options =>
                 options.UseSqlite($"Data Source={Environment.GetEnvironmentVariable("DB_PATH")}")
             );

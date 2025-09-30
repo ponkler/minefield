@@ -165,7 +165,7 @@ namespace Minefield.Services
                             return;
                         }
 
-                        await e.Message.RespondAsync($"{(targetUser ?? user).Username} has {(targetUser ?? user).Currency:N0} MF$.");
+                        await e.Message.RespondAsync($"{Formatter.Sanitize((targetUser ?? user).Username)} has {(targetUser ?? user).Currency:N0} MF$.");
                     }
                     break;
                 // C ======================================================================================================
@@ -255,7 +255,7 @@ namespace Minefield.Services
                             return;
                         }
 
-                        var lifelineName = user.LifelineTarget.Username;
+                        var lifelineName = Formatter.Sanitize(user.LifelineTarget.Username);
                         await _minefieldService.RemoveLifelineAsync(user);
 
                         await e.Message.RespondAsync($"You have ended your Lifeline with {lifelineName}");
@@ -276,7 +276,7 @@ namespace Minefield.Services
                             return;
                         }
 
-                        var sacrificeName = user.SacrificeTarget.Username;
+                        var sacrificeName = Formatter.Sanitize(user.SacrificeTarget.Username);
                         await _minefieldService.RemoveSacrificeAsync(user);
 
                         await e.Message.RespondAsync($"You have ended your Sacrifice for {sacrificeName}");
@@ -297,7 +297,7 @@ namespace Minefield.Services
                             return;
                         }
 
-                        var symbioteName = user.SymbioteTarget.Username;
+                        var symbioteName = Formatter.Sanitize(user.SymbioteTarget.Username);
                         await _minefieldService.RemoveSymbioteAsync(user);
 
                         await e.Message.RespondAsync($"You have ended your Symbiote for {symbioteName}");
@@ -437,7 +437,7 @@ namespace Minefield.Services
                         {
                             LeaderboardEntry newEntry = new LeaderboardEntry
                             {
-                                Name = entry.Username,
+                                Name = Formatter.Sanitize(entry.Username),
                                 Currency = entry.Currency
                             };
 
@@ -494,7 +494,7 @@ namespace Minefield.Services
                         var lifelineActivated = await _minefieldService.ActivateLifelineAsync(user, targetUser);
                         if (lifelineActivated)
                         {
-                            var lifelineName = user.LifelineTarget!.Username;
+                            var lifelineName = Formatter.Sanitize(user.LifelineTarget!.Username);
                             await e.Message.RespondAsync($":drop_of_blood: Lifeline activated! You have revived {lifelineName} and you will both receive the earnings of their next 10 messages. :drop_of_blood:");
                         }
                         else
@@ -544,7 +544,7 @@ namespace Minefield.Services
                             return;
                         }
 
-                        await e.Message.RespondAsync($"{(targetUser ?? user).Username}'s max odds are 1 in {(targetUser ?? user).MaxOdds}.");
+                        await e.Message.RespondAsync($"{Formatter.Sanitize((targetUser ?? user).Username)}'s max odds are 1 in {(targetUser ?? user).MaxOdds}.");
                     }
                     break;
                 case "!messages":
@@ -555,7 +555,7 @@ namespace Minefield.Services
                             return;
                         }
 
-                        await e.Message.RespondAsync($"{(targetUser ?? user).Username} has sent {(targetUser ?? user).TotalMessages:N0} messages.");
+                        await e.Message.RespondAsync($"{Formatter.Sanitize((targetUser ?? user).Username)} has sent {(targetUser ?? user).TotalMessages:N0} messages.");
                     }
                     break;
                 // N ======================================================================================================
@@ -569,7 +569,7 @@ namespace Minefield.Services
                             return;
                         }
 
-                        await e.Message.RespondAsync($"{(targetUser ?? user).Username}'s odds are 1 in {(targetUser ?? user).CurrentOdds}.");
+                        await e.Message.RespondAsync($"{Formatter.Sanitize((targetUser ?? user).Username)}'s odds are 1 in {(targetUser ?? user).CurrentOdds}.");
                     }
                     break;
                 // P ======================================================================================================
@@ -599,9 +599,7 @@ namespace Minefield.Services
 
                             var resetUser = await _userService.ResetUserAsync((targetUser ?? user).UserId, (targetUser ?? user).ServerId);
 
-                            var username = (await client.GetUserAsync((targetUser ?? user).UserId)).Username;
-
-                            await e.Message.RespondAsync($"{username}'s progress has been reset.");
+                            await e.Message.RespondAsync($"{Formatter.Sanitize((targetUser ?? user).Username)}'s progress has been reset.");
                             await _userService.SaveAsync();
                         }
                     }
@@ -654,7 +652,7 @@ namespace Minefield.Services
                             }
 
                             await _minefieldService.ReviveUser((targetUser ?? user));
-                            await e.Message.RespondAsync($"{(targetUser ?? user).Username} has been revived.");
+                            await e.Message.RespondAsync($"{Formatter.Sanitize((targetUser ?? user).Username)} has been revived.");
                         }
                     }
                     break;
@@ -706,8 +704,7 @@ namespace Minefield.Services
                         var sacrificeActivated = await _minefieldService.ActivateSacrificeAsync(user, targetUser);
                         if (sacrificeActivated)
                         {
-                            var sacrificeName = (await client.GetUserAsync(user.SacrificeTarget!.UserId)).Username;
-                            await e.Message.RespondAsync($":sheep: Sacrifice activated! Next time {sacrificeName} would be blown up by a mine, you will be blown up instead. :sheep:");
+                            await e.Message.RespondAsync($":sheep: Sacrifice activated! Next time {Formatter.Sanitize(user.SacrificeTarget!.Username)} would be blown up by a mine, you will be blown up instead. :sheep:");
                         }
                         else
                         {
@@ -735,14 +732,14 @@ namespace Minefield.Services
                             if (parsedArg && targetUser == null)
                             {
                                 user.Currency = argInt;
-                                await e.Message.RespondAsync($"Set {user.Username}'s balance to {argInt} MF$.");
+                                await e.Message.RespondAsync($"Set {Formatter.Sanitize(user.Username)}'s balance to {argInt} MF$.");
                                 await _userService.SaveAsync();
                             }
 
                             if (parsedArg && targetUser != null)
                             {
                                 targetUser.Currency = argInt;
-                                await e.Message.RespondAsync($"Set {targetUser.Username}'s balance to {argInt} MF$.");
+                                await e.Message.RespondAsync($"Set {Formatter.Sanitize(targetUser.Username)}'s balance to {argInt} MF$.");
                                 await _userService.SaveAsync();
                             }
                         }
@@ -767,7 +764,7 @@ namespace Minefield.Services
                             return;
                         }
 
-                        await e.Message.RespondAsync($"{(targetUser ?? user).Username} is currently on a streak of {(targetUser ?? user).CurrentStreak:N0}.");
+                        await e.Message.RespondAsync($"{Formatter.Sanitize((targetUser ?? user).Username)} is currently on a streak of {(targetUser ?? user).CurrentStreak:N0}.");
                     }
                     break;
                 case "!symbiote":
@@ -817,8 +814,7 @@ namespace Minefield.Services
                         var symbioteActivated = await _minefieldService.ActivateSymbioteAsync(user, targetUser);
                         if (symbioteActivated)
                         {
-                            var symbiotename = (await client.GetUserAsync(user.SymbioteTarget!.UserId)).Username;
-                            await e.Message.RespondAsync($":link: Symbiote activated! You have bound yourself to {symbiotename} and you will both receive the earnings of their next 5 messages. :link:");
+                            await e.Message.RespondAsync($":link: Symbiote activated! You have bound yourself to {Formatter.Sanitize(user.SymbioteTarget!.Username)} and you will both receive the earnings of their next 5 messages. :link:");
                         }
                         else
                         {
@@ -859,12 +855,12 @@ namespace Minefield.Services
 
         public async Task SendArenaStartedEmbedAsync(DiscordClient client, MessageCreateEventArgs e, MinefieldUser host, int buyIn)
         {
-            var name = (await client.GetUserAsync(host.UserId)).Username;
+            var str = $"{Formatter.Sanitize(host.Username)} has started an Arena which will begin in 60 seconds. Type \"!join\" to join. The buy in is {buyIn:N0} MF$.";
 
             var arenaStartedEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":rotating_light: Arena Started :rotating_light:")
                 .WithColor(DiscordColor.IndianRed)
-                .AddField("__Details__", $"{name} has started an Arena which will begin in 60 seconds. Type \"!join\" to join. The buy in is {buyIn:N0} MF$.", false);
+                .AddField("__Details__", Formatter.Sanitize(str), false);
 
             await e.Message.RespondAsync(embed: arenaStartedEmbed);
         }
@@ -885,15 +881,14 @@ namespace Minefield.Services
 
             foreach (var entry in participantRolls) 
             {
-                var name = (await client.GetUserAsync(entry.Key.UserId)).Username;
-                string str = $"\t• {name} - {entry.Value}/5 {(entry.Value == 5 ? ":boom:" : ":ok:")}";
+                string str = $"\t• {Formatter.Sanitize(entry.Key.Username)} - {entry.Value}/5 {(entry.Value == 5 ? ":boom:" : ":ok:")}";
                 rollStrings.Add(str);
             }
 
             var arenaRoundEmbed = new DiscordEmbedBuilder()
                 .WithTitle($":crossed_swords: Arena Round {round} :crossed_swords:")
                 .WithColor(DiscordColor.IndianRed)
-                .AddField("__Rolls__", string.Join("\n", rollStrings), false);
+                .AddField("__Rolls__", Formatter.Sanitize(string.Join("\n", rollStrings)), false);
 
             await channel.SendMessageAsync(embed: arenaRoundEmbed);
         }
@@ -911,7 +906,7 @@ namespace Minefield.Services
             var arenaResolveEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":dagger: Arena Participants :dagger:")
                 .WithColor(DiscordColor.IndianRed)
-                .AddField("__List__", string.Join("\n", users), false)
+                .AddField("__List__", Formatter.Sanitize(string.Join("\n", users)), false)
                 .AddField("__Payout__", $"\t• {payout:N0} MF$");
 
             await channel.SendMessageAsync(embed: arenaResolveEmbed);
@@ -926,14 +921,15 @@ namespace Minefield.Services
             foreach (var winner in winners)
             {
                 var name = (await client.GetUserAsync(winner.UserId)).Username;
-                string str = $"\t• {name} - {split:N0} MF$";
+                
+                string str = $"\t• {Formatter.Sanitize(winner.Username)} - {split:N0} MF$";
                 payoutStrings.Add(str);
             }
 
             var arenaResolveEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":trophy: Arena Winners :trophy:")
                 .WithColor(DiscordColor.Gold)
-                .AddField("__Winners__", string.Join("\n", payoutStrings), false);
+                .AddField("__Winners__", Formatter.Sanitize(string.Join("\n", payoutStrings)), false);
 
             await channel.SendMessageAsync(embed: arenaResolveEmbed);
         }
@@ -943,7 +939,7 @@ namespace Minefield.Services
             var deathPactEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":scroll: Death Pact :scroll:")
                 .WithColor(DiscordColor.Black)
-                .AddField("__Offer__", $"{targetUser.Username}, {e.Author.Username} has offered you a Death Pact. If you agree, you and {e.Author.Username} " +
+                .AddField("__Offer__", $"{Formatter.Sanitize(targetUser.Username)}, {Formatter.Sanitize(e.Author.Username)} has offered you a Death Pact. If you agree, you and {Formatter.Sanitize(e.Author.Username)} " +
                 $"will share message earnings, but if either of you trigger a mine, you will both blow up and lose 10 max odds instead of 5.", false)
                 .AddField("__Options__", $"\t• React :pen_fountain: to accept the Death Pact offer.\n" +
                 $"\t• React :x: to decline the Death Pact offer.");
@@ -966,7 +962,7 @@ namespace Minefield.Services
 
             if (reactionResult.TimedOut)
             {
-                await e.Message.RespondAsync($"{targetUser.Username} did not respond to your Death Pact offer.");
+                await e.Message.RespondAsync($"{Formatter.Sanitize(targetUser.Username)} did not respond to your Death Pact offer.");
                 return false;
             }
             else if (reactionResult.Result.Emoji == penEmoji) 
@@ -975,7 +971,7 @@ namespace Minefield.Services
             }
             else if (reactionResult.Result.Emoji == cancelEmoji)
             {
-                await e.Message.RespondAsync($"{targetUser.Username} declined your Death Pact offer.");
+                await e.Message.RespondAsync($"{Formatter.Sanitize(targetUser.Username)} declined your Death Pact offer.");
                 return false;
             }
 
@@ -1000,7 +996,9 @@ namespace Minefield.Services
                     $"\t• You may only have one link to a user. So, if you have a Sacrifice linked to a user, you cannot have a Symbiote linked to the same user.\n" +
                     $"\t• The best possible odds are 1 in 50. If you attempt to use Luck or Restore to go beyond this limit, the amount will automatically be capped.\n" +
                     $"\t• In a Sacrifice chain, Guardian will only be used on the final user.\n" +
-                    $"\t• Death Pacts cannot be ended manually.\n" +
+                    $"\t• Death Pacts cannot be ended manually."
+                )
+                .AddField("__Tips Continued__", 
                     $"\t• If you have Guardian activated, and your Death Pact partner triggers a mine, your Guardian will not defend you. If your partner has Guardian, and they trigger a mine, their Guardian will protect you both.\n" +
                     $"\t• The above is also true for Sacrifice. If your Death Pact partner triggers a mine, but you have a Sacrifice linked to you, your Sacrifice will not save you, but your partners will save you both.\n" +
                     $"\t• With Guardian active, triggering a mine won't remove you from the channel, but it will still lower your maximum odds, and will cut your streak in half. This applies in Death Pacts and Sacrifice chains."
@@ -1021,7 +1019,7 @@ namespace Minefield.Services
                 $"{(targetUser.SymbioteTarget != null ? ":link:" : "")}";
 
             var embed = new DiscordEmbedBuilder()
-                .WithTitle($"{(targetUser.IsAlive ? ":heart:" : ":headstone:")} {targetUser.Username} {perkString}")
+                .WithTitle($"{(targetUser.IsAlive ? ":heart:" : ":headstone:")} {Formatter.Sanitize(targetUser.Username)} {perkString}")
                 .WithColor(targetUser.IsAlive ? DiscordColor.Green : DiscordColor.Red)
                 .AddField("__Stats__",
                     $"\t• **Odds:** 1 in {targetUser.CurrentOdds}\n" +
@@ -1033,12 +1031,12 @@ namespace Minefield.Services
 
             var perkDetails = new List<string>();
             if (targetUser.AegisCharges > 0) perkDetails.Add($"\t• :shield: **Aegis Messages Remaining:** {targetUser.AegisCharges}");
-            if (targetUser.DeathPactTarget != null) perkDetails.Add($"\t• :scroll: **Death Pact:** {targetUser.DeathPactTarget.Username}");
+            if (targetUser.DeathPactTarget != null) perkDetails.Add($"\t• :scroll: **Death Pact:** {Formatter.Sanitize(targetUser.DeathPactTarget.Username)}");
             if (targetUser.HasGuardian) perkDetails.Add($"\t• :angel: **Guardian:** Active");
-            if (targetUser.LifelineTarget != null) perkDetails.Add($"\t• :drop_of_blood: **Lifeline Target:** {targetUser.LifelineTarget.Username} ({targetUser.LifelineCharges} messages remaining)");
+            if (targetUser.LifelineTarget != null) perkDetails.Add($"\t• :drop_of_blood: **Lifeline Target:** {Formatter.Sanitize(targetUser.LifelineTarget.Username)} ({targetUser.LifelineCharges} messages remaining)");
             if (targetUser.FortuneCharges > 0) perkDetails.Add($"\t• :coin: **Fortune Messages Remaining:** {targetUser.FortuneCharges}");
-            if (targetUser.SacrificeTarget != null) perkDetails.Add($"\t• :sheep: **Sacrifice Target:** {targetUser.SacrificeTarget.Username}");
-            if (targetUser.SymbioteTarget != null) perkDetails.Add($"\t• :link: **Symbiote Target:** {targetUser.SymbioteTarget.Username} ({targetUser.SymbioteCharges} messages remaining)");
+            if (targetUser.SacrificeTarget != null) perkDetails.Add($"\t• :sheep: **Sacrifice Target:** {Formatter.Sanitize(targetUser.SacrificeTarget.Username)}");
+            if (targetUser.SymbioteTarget != null) perkDetails.Add($"\t• :link: **Symbiote Target:** {Formatter.Sanitize(targetUser.SymbioteTarget.Username)} ({targetUser.SymbioteCharges} messages remaining)");
 
             if (perkDetails.Count > 0)
                 embed.AddField("__Perks__", string.Join("\n", perkDetails));
@@ -1132,7 +1130,7 @@ namespace Minefield.Services
 
             foreach (var entry in leaderboardEntries)
             {
-                string newEntry = $"{prefixes[index]} {entry.Name} - {entry.Currency:N0} MF$";
+                string newEntry = $"{prefixes[index]} {Formatter.Sanitize(entry.Name)} - {entry.Currency:N0} MF$";
                 entryStrings.Add(newEntry);
                 index++;
             }
@@ -1140,7 +1138,7 @@ namespace Minefield.Services
             var leaderboardEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":trophy: Minefield Leaderboard :trophy:")
                 .WithColor(DiscordColor.Gold)
-                .AddField("__Top 10__", string.Join("\n", entryStrings), false);
+                .AddField("__Top 10__", Formatter.Sanitize(string.Join("\n", entryStrings)), false);
 
             await e.Message.RespondAsync(embed: leaderboardEmbed);
         }
@@ -1152,7 +1150,7 @@ namespace Minefield.Services
             var userEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":person_standing: Minefield Users :person_standing:")
                 .WithColor(DiscordColor.Azure)
-                .AddField("__List__", string.Join("\n", usernames), false);
+                .AddField("__List__", Formatter.Sanitize(string.Join("\n", usernames)), false);
 
             await e.Message.RespondAsync(embed: userEmbed);
         }
