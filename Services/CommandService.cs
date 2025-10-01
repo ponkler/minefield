@@ -855,12 +855,13 @@ namespace Minefield.Services
 
         public async Task SendArenaStartedEmbedAsync(DiscordClient client, MessageCreateEventArgs e, MinefieldUser host, int buyIn)
         {
-            var str = $"{Formatter.Sanitize(host.Username)} has started an Arena which will begin in 60 seconds. Type \"!join\" to join. The buy in is {buyIn:N0} MF$.";
+            var hostName = Formatter.Sanitize(host.Username);
+            var str = $"{hostName} has started an Arena which will begin in 60 seconds. Type \"!join\" to join. The buy in is {buyIn:N0} MF$.";
 
             var arenaStartedEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":rotating_light: Arena Started :rotating_light:")
                 .WithColor(DiscordColor.IndianRed)
-                .AddField("__Details__", Formatter.Sanitize(str), false);
+                .AddField("__Details__", str, false);
 
             await e.Message.RespondAsync(embed: arenaStartedEmbed);
         }
@@ -881,14 +882,15 @@ namespace Minefield.Services
 
             foreach (var entry in participantRolls) 
             {
-                string str = $"\t• {Formatter.Sanitize(entry.Key.Username)} - {entry.Value}/5 {(entry.Value == 5 ? ":boom:" : ":ok:")}";
+                string entryName = Formatter.Sanitize(entry.Key.Username);
+                string str = $"\t• {entryName} - {entry.Value}/5 {(entry.Value == 5 ? ":boom:" : ":ok:")}";
                 rollStrings.Add(str);
             }
 
             var arenaRoundEmbed = new DiscordEmbedBuilder()
                 .WithTitle($":crossed_swords: Arena Round {round} :crossed_swords:")
                 .WithColor(DiscordColor.IndianRed)
-                .AddField("__Rolls__", Formatter.Sanitize(string.Join("\n", rollStrings)), false);
+                .AddField("__Rolls__", string.Join("\n", rollStrings), false);
 
             await channel.SendMessageAsync(embed: arenaRoundEmbed);
         }
@@ -899,14 +901,15 @@ namespace Minefield.Services
 
             foreach (var participant in participants)
             {
-                string str = $"\t• {participant.Username}";
+                string participantName = Formatter.Sanitize(participant.Username);
+                string str = $"\t• {participantName}";
                 users.Add(str);
             }
 
             var arenaResolveEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":dagger: Arena Participants :dagger:")
                 .WithColor(DiscordColor.IndianRed)
-                .AddField("__List__", Formatter.Sanitize(string.Join("\n", users)), false)
+                .AddField("__List__", string.Join("\n", users), false)
                 .AddField("__Payout__", $"\t• {payout:N0} MF$");
 
             await channel.SendMessageAsync(embed: arenaResolveEmbed);
@@ -920,16 +923,16 @@ namespace Minefield.Services
 
             foreach (var winner in winners)
             {
-                var name = (await client.GetUserAsync(winner.UserId)).Username;
+                var winnerName = Formatter.Sanitize(winner.Username);
                 
-                string str = $"\t• {Formatter.Sanitize(winner.Username)} - {split:N0} MF$";
+                string str = $"\t• {winnerName} - {split:N0} MF$";
                 payoutStrings.Add(str);
             }
 
             var arenaResolveEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":trophy: Arena Winners :trophy:")
                 .WithColor(DiscordColor.Gold)
-                .AddField("__Winners__", Formatter.Sanitize(string.Join("\n", payoutStrings)), false);
+                .AddField("__Winners__", string.Join("\n", payoutStrings), false);
 
             await channel.SendMessageAsync(embed: arenaResolveEmbed);
         }
@@ -1130,7 +1133,7 @@ namespace Minefield.Services
 
             foreach (var entry in leaderboardEntries)
             {
-                string newEntry = $"{prefixes[index]} {Formatter.Sanitize(entry.Name)} - {entry.Currency:N0} MF$";
+                string newEntry = $"{prefixes[index]} {entry.Name} - {entry.Currency:N0} MF$";
                 entryStrings.Add(newEntry);
                 index++;
             }
@@ -1138,7 +1141,7 @@ namespace Minefield.Services
             var leaderboardEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":trophy: Minefield Leaderboard :trophy:")
                 .WithColor(DiscordColor.Gold)
-                .AddField("__Top 10__", Formatter.Sanitize(string.Join("\n", entryStrings)), false);
+                .AddField("__Top 10__", string.Join("\n", entryStrings), false);
 
             await e.Message.RespondAsync(embed: leaderboardEmbed);
         }
