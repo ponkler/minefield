@@ -1,4 +1,5 @@
-﻿using Minefield.Entities;
+﻿using DSharpPlus.CommandsNext;
+using Minefield.Entities;
 
 namespace Minefield.Services
 {
@@ -9,19 +10,25 @@ namespace Minefield.Services
 
         private Arena? Arena;
 
-        public event Func<Arena, Task>? ArenaStarted;
+        public event Func<CommandContext, Arena, Task>? ArenaStarted;
 
         public readonly Dictionary<string, int> perkCosts = new Dictionary<string, int>
         {
-            { "aegis", 100 },
-            { "death_pact", 125 },
+            { "aegis", 90 },
+            { "death_pact", 100 },
             { "fortune", 80 },
-            { "guardian", 70 },
-            { "lifeline", 100 },
+            { "guardian", 60 },
+            { "lifeline", 70 },
             { "luck", 25 },
-            { "restore", 200 },
-            { "sacrifice", 50 },
-            { "symbiote", 90 }
+            { "restore", 175 },
+            { "sacrifice", 75 },
+            { "symbiote", 85 }
+        };
+
+        public readonly Dictionary<string, int> perkCooldowns = new Dictionary<string, int>
+        {
+            { "aegis", 20 },
+            { "guardian", 15 }
         };
 
         public event Func<MinefieldUser, Task>? UserRevived;
@@ -33,76 +40,24 @@ namespace Minefield.Services
 
         public async Task<RollResult> ProcessMessageAsync(MinefieldUser user)
         {
-            int odds = 0;
-            int roll = 0;
-            bool triggered = false;
-            bool aegisUsed = false;
-            List<(MinefieldUser provider, MinefieldUser target)> sacrifices = new List<(MinefieldUser provider, MinefieldUser target)>();
-
-            if (!user.IsAlive) 
+            if (!user.IsAlive)
             {
-                return new RollResult
-                {
-                    Odds = -1,
-                    Roll = -1,
-                    Triggered = false,
-                    CloseCall = false,
-                };
+                return RollResult.Dead;
             }
 
             user.CurrentStreak++;
             user.TotalMessages++;
+
             if (user.AegisCharges == 0) { user.MessagesSinceAegis++; }
-            if (user.HasGuardian == false) { user.MessagesSinceGuardian++; }
+            if (!user.HasGuardian) { user.MessagesSinceGuardian++; }
 
-            int currencyToAdd = 0;
-            if (user.FortuneCharges > 0)
-            {
-                currencyToAdd = user.CurrentStreak * 2;
-                user.FortuneCharges--;
-            }
-            else
-            {
-                currencyToAdd = user.CurrentStreak;
-            }
-            user.Currency += currencyToAdd;
-            user.LifetimeCurrency += currencyToAdd;
+            int currencyToAdd = CalculateEarnings(user);
+            await GiveCurrencyAsync(user, currencyToAdd);
 
-            if (user.DeathPactTarget != null)
-            {
-                user.DeathPactTarget.Currency += currencyToAdd;
-                user.DeathPactTarget.LifetimeCurrency += currencyToAdd;
-            }
+            bool aegisUsed = TryUseAegis(user);
 
-            if (user.LifelineProvider != null)
-            {
-                user.LifelineProvider.LifelineCharges--;
-                user.LifelineProvider.Currency += currencyToAdd;
-                user.LifelineProvider.LifetimeCurrency += currencyToAdd;
-
-                if (user.LifelineProvider.LifelineCharges == 0)
-                {
-                    await RemoveLifelineAsync(user.LifelineProvider);
-                }
-            }
-
-            if (user.SymbioteProvider != null)
-            {
-                user.SymbioteProvider.SymbioteCharges--;
-                user.SymbioteProvider.Currency += currencyToAdd;
-                user.SymbioteProvider.LifetimeCurrency += currencyToAdd;
-
-                if (user.SymbioteProvider.SymbioteCharges == 0)
-                {
-                    await RemoveSymbioteAsync(user.SymbioteProvider);
-                }
-            }
-
-            if (user.AegisCharges > 0)
-            {
-                user.AegisCharges--;
-                aegisUsed = true;
-            }
+            int roll = 0;
+            bool triggered = false;
 
             if (!aegisUsed)
             {
@@ -110,29 +65,15 @@ namespace Minefield.Services
                 triggered = roll == user.CurrentOdds;
             }
 
+            List<(MinefieldUser provider, MinefieldUser target)> sacrifices = new();
+
             if (triggered)
             {
-                user.CurrentStreak = user.CurrentStreak / 2;
-
-                if (user.DeathPactTarget != null)
-                {
-                    user.MaxOdds = Math.Max(user.MaxOdds - 10, 10);
-                    user.DeathPactTarget.MaxOdds = Math.Max(user.DeathPactTarget.MaxOdds - 10, 10);
-
-                    user.DeathPactTarget.CurrentOdds = Math.Min(user.DeathPactTarget.CurrentOdds, user.DeathPactTarget.MaxOdds);
-                }
-                else
-                {
-                    user.MaxOdds = Math.Max(user.MaxOdds - 5, 10);
-                }
-
-                user.CurrentOdds = Math.Min(user.CurrentOdds, user.MaxOdds);
-                
-                sacrifices = await BlowUpAsync(user);
+                sacrifices = await GetUserSacrificeChain(user);
             }
 
-            odds = user.CurrentOdds;
-            if (user.CurrentOdds > 10) { user.CurrentOdds--; }
+            int odds = user.CurrentOdds;
+            if (odds > 2) { user.CurrentOdds--; }
 
             await _userService.SaveAsync();
             return new RollResult
@@ -143,6 +84,94 @@ namespace Minefield.Services
                 CloseCall = odds - roll <= 5 && !triggered,
                 Sacrifices = sacrifices
             };
+        }
+
+        private int CalculateEarnings(MinefieldUser user)
+        {
+            if (user.FortuneCharges > 0)
+            {
+                user.FortuneCharges--;
+                return user.CurrentStreak * 2;
+            }
+            return user.CurrentStreak;
+        }
+
+        private async Task GiveCurrencyAsync(MinefieldUser user, int amount)
+        {
+            user.Currency += amount;
+            user.LifetimeCurrency += amount;
+
+            GiveDeathPactCurrency(user.DeathPactTarget, amount);
+            await GiveLifelineCurrency(user.LifelineProvider, user, amount);
+            await GiveSymbioteCurrencyAsync(user.SymbioteProvider, user, amount);
+        }
+
+        private void GiveDeathPactCurrency(MinefieldUser? target, int amount)
+        {
+            if (target is null) return;
+
+            target.Currency += amount;
+            target.LifetimeCurrency += amount;
+        }
+
+        private async Task GiveLifelineCurrency(MinefieldUser? provider, MinefieldUser user, int amount)
+        {
+            if (provider is null) return;
+
+            provider.Currency += amount;
+            provider.LifetimeCurrency += amount;
+
+            provider.LifelineCharges--;
+
+            if (provider.LifelineCharges == 0)
+            {
+                await RemoveLifelineAsync(provider, user);
+            }
+        }
+
+        private async Task GiveSymbioteCurrencyAsync(MinefieldUser? provider, MinefieldUser user, int amount)
+        {
+            if (provider is null) return;
+
+            provider.Currency += amount;
+            provider.LifetimeCurrency += amount;
+
+            provider.SymbioteCharges--;
+
+            if (provider.SymbioteCharges == 0)
+            {
+                await RemoveSymbioteAsync(provider, user);
+            }   
+        }
+
+        private bool TryUseAegis(MinefieldUser user)
+        {
+            if (user.AegisCharges > 0)
+            {
+                user.AegisCharges--;
+                return true;
+            }
+            return false;
+        }
+
+        public void HandleOddsDeduction(MinefieldUser user)
+        {
+            if (user.DeathPactTarget is not null)
+            {
+                user.MaxOdds = Math.Max(user.MaxOdds - 5, 2);
+                user.DeathPactTarget.MaxOdds = Math.Max(user.DeathPactTarget.MaxOdds - 5, 2);
+
+                user.DeathPactTarget.CurrentOdds = Math.Min(
+                    user.DeathPactTarget.CurrentOdds,
+                    user.DeathPactTarget.MaxOdds
+                );
+            }
+            else
+            {
+                user.MaxOdds = Math.Max(user.MaxOdds - 2, 2);
+            }
+
+            user.CurrentOdds = Math.Min(user.CurrentOdds, user.MaxOdds);
         }
 
         public async Task<bool> ActivateAegisAsync(MinefieldUser user)
@@ -207,9 +236,14 @@ namespace Minefield.Services
             user.LifelineTarget = target;
             user.LifelineCharges = 10;
 
-            await ReviveUser(target);
+            target.LifelineProviderId = user.UserId;
+            target.LifelineProviderServerId = user.ServerId;
+            target.LifelineProvider = user;
 
             await _userService.SaveAsync();
+
+            ReviveUser(target);
+
             return true;
         }
 
@@ -297,113 +331,136 @@ namespace Minefield.Services
             return true;
         }
 
-        public async Task RemoveDeathPactAsync(MinefieldUser user)
+        public async Task RemoveDeathPactAsync(MinefieldUser? a, MinefieldUser? b)
         {
-            if (user.DeathPactTarget == null) { return; }
+            if (a == null || b == null) { return; }
 
-            user.DeathPactTarget.DeathPactTargetId = null;
-            user.DeathPactTarget.DeathPactTargetServerId = null;
-            user.DeathPactTarget.DeathPactTarget = null;
+            if (a.DeathPactTarget == null) { return; }
+            if (b.DeathPactTarget == null) { return; }
 
-            user.DeathPactTargetId = null;
-            user.DeathPactTargetServerId = null;
-            user.DeathPactTarget = null;
+            a.DeathPactTargetId = null;
+            a.DeathPactTargetServerId = null;
+            a.DeathPactTarget = null;
+
+            b.DeathPactTargetId = null;
+            b.DeathPactTargetServerId = null;
+            b.DeathPactTarget = null;
 
             await _userService.SaveAsync();
         }
 
-        public async Task RemoveLifelineAsync(MinefieldUser user)
+        public async Task RemoveLifelineAsync(MinefieldUser? provider, MinefieldUser? target)
         {
-            if (user.LifelineTarget == null) { return; }
+            if (provider == null) { return; }
+            if (target == null) { return; }
+            if (provider.LifelineTarget == null) { return; }
+            if (target.LifelineProvider == null) { return; }
 
-            user.LifelineTarget.LifelineProviderId = null;
-            user.LifelineTarget.LifelineProviderServerId = null;
-            user.LifelineTarget.LifelineProvider = null;
+            target.LifelineProviderId = null;
+            target.LifelineProviderServerId = null;
+            target.LifelineProvider = null;
 
-            user.LifelineTargetId = null;
-            user.LifelineTargetServerId = null;
-            user.LifelineTarget = null;
+            provider.LifelineTargetId = null;
+            provider.LifelineTargetServerId = null;
+            provider.LifelineTarget = null;
 
-            user.LifelineCharges = 0;
+            provider.LifelineCharges = 0;
 
             await _userService.SaveAsync();
         }
 
-        public async Task RemoveSacrificeAsync(MinefieldUser user)
+        public async Task RemoveSacrificeAsync(MinefieldUser? provider, MinefieldUser? target)
         {
-            if (user.SacrificeTarget == null) { return; }
+            if (provider == null) { return; }
+            if (target == null) { return; }
+            if (provider.SacrificeTarget == null) { return; }
+            if (target.SacrificeProvider == null) { return; }
 
-            user.SacrificeTarget.SacrificeProviderId = null;
-            user.SacrificeTarget.SacrificeProviderServerId = null;
-            user.SacrificeTarget.SacrificeProvider = null;
+            target.SacrificeProviderId = null;
+            target.SacrificeProviderServerId = null;
+            target.SacrificeProvider = null;
 
-            user.SacrificeTargetId = null;
-            user.SacrificeTargetServerId = null;
-            user.SacrificeTarget = null;
+            provider.SacrificeTargetId = null;
+            provider.SacrificeTargetServerId = null;
+            provider.SacrificeTarget = null;
 
             await _userService.SaveAsync();
         }
 
-        public async Task RemoveSymbioteAsync(MinefieldUser user)
+        public async Task RemoveSymbioteAsync(MinefieldUser? provider, MinefieldUser? target)
         {
-            if (user.SymbioteTarget == null) { return; }
+            if (provider == null) { return; }
+            if (target == null) { return; }
+            if (provider.SymbioteTarget == null) { return; }
+            if (target.SymbioteProvider == null) { return; }
 
-            user.SymbioteTarget.SymbioteProviderId = null;
-            user.SymbioteTarget.SymbioteProviderServerId = null;
-            user.SymbioteTarget.SymbioteProvider = null;
+            target.SymbioteProviderId = null;
+            target.SymbioteProviderServerId = null;
+            target.SymbioteProvider = null;
 
-            user.SymbioteTargetId = null;
-            user.SymbioteTargetServerId = null;
-            user.SymbioteTarget = null;
+            provider.SymbioteTargetId = null;
+            provider.SymbioteTargetServerId = null;
+            provider.SymbioteTarget = null;
+
+            provider.SymbioteCharges = 0;
 
             await _userService.SaveAsync();
         }
 
-        public async Task RemoveBoundPerksAsync(MinefieldUser user)
+        public async Task RemoveAllUserRelevantPerks(MinefieldUser? user)
         {
-            await RemoveDeathPactAsync(user);
-            await RemoveLifelineAsync(user);
-            await RemoveSacrificeAsync(user);
-            await RemoveSymbioteAsync(user);
+            if (user == null) { return; }
+
+            if (user.AegisCharges > 0) {  user.AegisCharges = 0; }
+
+            if (user.DeathPactTarget != null) { await RemoveDeathPactAsync(user, user.DeathPactTarget); }
+
+            if (user.FortuneCharges > 0) { user.FortuneCharges = 0; }
+
+            if (user.HasGuardian) {  user.HasGuardian = false; }
+
+            if (user.LifelineTarget != null) { await RemoveLifelineAsync(user, user.LifelineTarget); }
+            if (user.LifelineProvider != null) { await RemoveLifelineAsync(user.LifelineProvider, user); }
+
+            if (user.SymbioteTarget != null) { await RemoveSymbioteAsync(user, user.SymbioteTarget); }
+            if (user.SymbioteProvider != null) { await RemoveSymbioteAsync(user.SymbioteProvider, user); }
+            
+            await _userService.SaveAsync();
         }
 
-        public async Task ReviveUser(MinefieldUser user)
+        public void ReviveUser(MinefieldUser user)
         {
             user.IsAlive = true;
             user.CurrentOdds = user.MaxOdds;
             user.CurrentStreak = 0;
-            await RemoveBoundPerksAsync(user);
 
             UserRevived?.Invoke(user);
         }
 
-        public async Task<List<(MinefieldUser provider, MinefieldUser target)>> BlowUpAsync(MinefieldUser user)
+        public async Task<List<(MinefieldUser provider, MinefieldUser target)>> GetUserSacrificeChain(MinefieldUser user)
         {
             List<(MinefieldUser provider, MinefieldUser target)> sacrifices = new List<(MinefieldUser provider, MinefieldUser target)>();
 
             var sacrifice = await _userService.GetUserAsync(user.SacrificeProviderId, user.ServerId);
 
-            if (sacrifice == null) 
-            {
-                user.IsAlive = false;
-                await _userService.SaveAsync();
-            }
-
             while (sacrifice != null)
             {
                 sacrifices.Add((sacrifice, sacrifice.SacrificeTarget!));
 
-                sacrifice.Currency += (int)(user.Currency * 0.1);
-
-                sacrifice.SacrificeTarget!.SacrificeProviderId = null;
-                sacrifice.SacrificeTarget!.SacrificeProviderServerId = null;
-                sacrifice.SacrificeTarget!.SacrificeProvider = null;
-
-                sacrifice.SacrificeTargetId = null;
-                sacrifice.SacrificeTargetServerId = null;
-                sacrifice.SacrificeTarget = null;
+                sacrifice.Currency += user.Currency / 5;
 
                 var newSacrifice = await _userService.GetUserAsync(sacrifice.SacrificeProviderId, sacrifice.ServerId);
+
+                if (newSacrifice != null)
+                {
+                    sacrifice.SacrificeTarget!.SacrificeProviderId = null;
+                    sacrifice.SacrificeTarget!.SacrificeProviderServerId = null;
+                    sacrifice.SacrificeTarget!.SacrificeProvider = null;
+
+                    sacrifice.SacrificeTargetId = null;
+                    sacrifice.SacrificeTargetServerId = null;
+                    sacrifice.SacrificeTarget = null;
+                }
 
                 sacrifice = newSacrifice;
                 await _userService.SaveAsync();
@@ -415,7 +472,6 @@ namespace Minefield.Services
         {
             user.Currency -= Arena!.BuyIn;
             Arena!.Participants.Add(user);
-            Console.WriteLine($"{user.Username} added to Arena. Participants: {Arena!.Participants.Count}");
             await _userService.SaveAsync();
         }
 
@@ -442,7 +498,7 @@ namespace Minefield.Services
             return Arena != null;
         }
 
-        public async Task<bool> SetUpArenaAsync(int buyIn, MinefieldUser host)
+        public async Task<bool> SetUpArenaAsync(CommandContext ctx, int buyIn, MinefieldUser host)
         {
             Arena = new Arena
             {
@@ -462,7 +518,7 @@ namespace Minefield.Services
             }
 
             Arena.Payout = Arena.BuyIn * Arena.Participants.Count;
-            ArenaStarted?.Invoke(Arena);
+            ArenaStarted?.Invoke(ctx, Arena);
             return true;
         }
 
@@ -473,7 +529,7 @@ namespace Minefield.Services
             foreach (var winner in winners)
             {
                 winner.Currency += split;
-                winner.LifetimeCurrency += split;
+                winner.LifetimeCurrency += split - Arena!.BuyIn;
                 await _userService.SaveAsync();
             }
 
@@ -493,7 +549,14 @@ namespace Minefield.Services
         public bool Triggered { get; set; }
         public bool CloseCall { get; set; }
         public List<(MinefieldUser provider, MinefieldUser target)> Sacrifices { get; set; } = new List<(MinefieldUser provider, MinefieldUser target)>();
-    }
+        public static RollResult Dead = new RollResult
+            {
+                Odds = -1,
+                Roll = -1,
+                Triggered = false,
+                CloseCall = false,
+            };
+}
 
     public class Arena
     {

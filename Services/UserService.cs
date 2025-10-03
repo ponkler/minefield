@@ -40,6 +40,15 @@ namespace Minefield.Services
             return await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId && u.ServerId == serverId);
         }
 
+        public async Task<MinefieldUser?> GetUserByUsernameAsync(string username, ulong serverId)
+        {
+            return await _context.Users
+                .FirstOrDefaultAsync(u => 
+                    u.Username == username && 
+                    u.ServerId == serverId
+                );
+        }
+
         public async Task<List<string>> GetAllUsernamesAsync(ulong serverId)
         {
             return await _context.Users.Where(u => u.ServerId == serverId)
@@ -47,23 +56,31 @@ namespace Minefield.Services
                 .ToListAsync();
         }
 
-        public async Task<MinefieldUser?> ResetUserAsync(ulong userId, ulong serverId)
+        public async Task<List<string>> GetAllDeadUsernamesAsync(ulong serverId)
+        {
+            return await _context.Users.Where(u => u.ServerId == serverId && !u.IsAlive)
+                .Select(u => u.Username)
+                .ToListAsync();
+        }
+
+        public async Task ResetUserAsync(ulong userId, ulong serverId)
         {
             var user = await GetUserAsync(userId, serverId);
             
-            if (user == null) { return null; }
+            if (user == null) { return; }
+
             var name = user.Username;
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
 
-            user = await GetOrCreateUserAsync(userId, serverId, name);
-            return user;
+            await GetOrCreateUserAsync(userId, serverId, name);
         }
 
         public async Task<List<MinefieldUser>> GetLeaderboardAsync(ulong serverId)
         {
             var leaderboard = await _context.Users.Where(u => u.ServerId == serverId)
-                .OrderByDescending(u => u.Currency)
+                .OrderByDescending(u => u.LifetimeCurrency)
+                .ThenBy(u => u.Username)
                 .Take(10)
                 .ToListAsync();
 
@@ -77,7 +94,10 @@ namespace Minefield.Services
                     u.DeathPactTargetId == sourceUser.UserId ||
                     u.LifelineProviderId == sourceUser.UserId || 
                     u.SacrificeProviderId == sourceUser.UserId || 
-                    u.SymbioteProviderId == sourceUser.UserId) &&
+                    u.SymbioteProviderId == sourceUser.UserId ||
+                    u.LifelineTargetId == sourceUser.UserId ||
+                    u.SacrificeTargetId == sourceUser.UserId ||
+                    u.SymbioteTargetId == sourceUser.UserId) &&
                     sourceUser.ServerId == u.ServerId)
                 .ToListAsync();
         }

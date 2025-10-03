@@ -1,15 +1,15 @@
 ﻿using DSharpPlus;
+using DSharpPlus.CommandsNext;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using Minefield.Entities;
-using System.Collections.Generic;
 
 namespace Minefield.Services
 {
     public class BotService
     {
         private readonly DiscordClient _client;
-        private readonly CommandService _commandService;
+        private readonly EmbedService _embedService;
         private readonly MinefieldService _minefieldService;
         private readonly UserService _userService;
 
@@ -22,11 +22,11 @@ namespace Minefield.Services
             "Spotting something suspicious partially buried, you freeze, carefully retracting your foot and feeling your heartbeat pound. You reach for a rock, throw it at the ground in front of you, and duck. The explosion that follows sends dirt and metal into the air, but you remain intact, unharmed. You rise, relieved."
         };
 
-        public BotService(DiscordClient client, CommandService commandService,
+        public BotService(DiscordClient client, EmbedService embedService,
             MinefieldService minefieldService, UserService userService)
         {
             _client = client;
-            _commandService = commandService;
+            _embedService = embedService;
             _minefieldService = minefieldService;
             _userService = userService;
 
@@ -34,19 +34,6 @@ namespace Minefield.Services
             _minefieldService.ArenaStarted += OnArenaStarted;
 
             _client.MessageCreated += OnMessageCreatedAsync;
-            _client.MessageCreated += async (c, e) =>
-            {
-                if (e.Message.Author.IsBot) return;
-                var server = e.Guild;
-                var channel = await GetMinefieldChannelAsync(server.Id);
-                var member = await server.GetMemberAsync(e.Message.Author.Id);
-                if (e.Channel == channel)
-                {
-                    Console.WriteLine($"Message received from {e.Message.Author.Username}{(member.Roles.Where(r => r.Name == "Minefield Janitor").FirstOrDefault() == null ? "" : ", Janitor")}: {e.Message.Content}");
-                }
-
-                await Task.CompletedTask;
-            };
 
             _client.Ready += async (c, a) =>
             {
@@ -87,7 +74,7 @@ namespace Minefield.Services
             if (e.Author.IsBot || channel == null || e.Message.Channel.Id != channel.Id) { return; }
 
             if (e.Message.Content.StartsWith("!"))
-                await _commandService.HandleCommandAsync(sender, e);
+                return;
             else
             {
                 var user = await _userService.GetOrCreateUserAsync(e.Author.Id, e.Guild.Id, e.Author.Username);
@@ -101,8 +88,11 @@ namespace Minefield.Services
                 if (result.Triggered)
                 {
                     var deadUser = user;
+                    bool sacrificed = false;
+
                     foreach ((MinefieldUser provider, MinefieldUser target) sacrifice in result.Sacrifices)
                     {
+                        sacrificed = true;
                         deadUser = sacrifice.provider;
                         var providerName = (await _client.GetUserAsync(sacrifice.provider.UserId)).Username;
                         var targetName = (await _client.GetUserAsync(sacrifice.target.UserId)).Username;
@@ -117,13 +107,25 @@ namespace Minefield.Services
                     else
                     {
                         deadUser.IsAlive = false;
+                        
+                        _minefieldService.HandleOddsDeduction(deadUser);
+
                         if (deadUser.DeathPactTarget != null)
                         {
                             deadUser.DeathPactTarget.IsAlive = false;
                             await e.Message.RespondAsync($":scroll: {deadUser.DeathPactTarget.Username} has been claimed by their Death Pact with {deadUser.Username} :scroll:");
                             await HandleUserDeathAsync(deadUser.DeathPactTarget);
                         }
-                        await HandleUserDeathAsync(deadUser);
+
+                        if (sacrificed)
+                        {
+                            await HandleUserSacrificeAsync(deadUser);
+                        }
+                        else
+                        {
+                            await HandleUserDeathAsync(deadUser);
+                        }
+
                         await e.Message.RespondAsync(":boom:");
                     }
                     return;
@@ -146,7 +148,35 @@ namespace Minefield.Services
 
         private async Task HandleUserDeathAsync(MinefieldUser user)
         {
-            await _minefieldService.RemoveBoundPerksAsync(user);
+            await _minefieldService.RemoveAllUserRelevantPerks(user);
+            if (user.SacrificeTarget != null) { await _minefieldService.RemoveSacrificeAsync(user, user.SacrificeTarget); }
+            if (user.SacrificeProvider != null) { await _minefieldService.RemoveSacrificeAsync(user.SacrificeProvider, user); }
+
+            user.Currency /= 2;
+
+            var server = await _client.GetGuildAsync(user.ServerId);
+            var channel = await GetMinefieldChannelAsync(user.ServerId);
+            var member = await server.GetMemberAsync(user.UserId);
+
+            if (member.IsOwner) { return; }
+
+            if (channel == null) { return; }
+
+            var perms = channel!.PermissionsFor(member);
+
+            if (!perms.HasPermission(Permissions.SendMessages))
+            {
+                return;
+            }
+
+            await channel.AddOverwriteAsync(member, deny: Permissions.SendMessages | Permissions.AccessChannels);
+            await _userService.SaveAsync();
+        }
+
+        private async Task HandleUserSacrificeAsync(MinefieldUser user)
+        {
+            await _minefieldService.RemoveAllUserRelevantPerks(user);
+            user.Currency /= 2;
 
             var server = await _client.GetGuildAsync(user.ServerId);
             var channel = await GetMinefieldChannelAsync(user.ServerId);
@@ -177,14 +207,16 @@ namespace Minefield.Services
 
             if (channel == null) { return; }
 
+            if (user.SacrificeTarget != null) { await _minefieldService.RemoveSacrificeAsync(user, user.SacrificeTarget); }
+            if (user.SacrificeProvider != null) { await _minefieldService.RemoveSacrificeAsync(user.SacrificeProvider, user); }
+
             await channel.DeleteOverwriteAsync(member);
             await _userService.SaveAsync();
         }
 
-        private async Task OnArenaStarted(Arena arena)
+        private async Task OnArenaStarted(CommandContext ctx, Arena arena)
         {
-            var channel = await GetMinefieldChannelAsync(arena.Participants.First().ServerId);
-            await _commandService.SendArenaParticipantsEmbedAsync(_client, channel!, arena.Participants, arena.Payout);
+            await _embedService.SendArenaParticipantsEmbedAsync(ctx, arena.Participants, arena.Payout);
             await Task.Delay(3000);
 
             List<MinefieldUser> winners = new List<MinefieldUser>();
@@ -216,13 +248,13 @@ namespace Minefield.Services
                     winners.Add(survivors.First());
                 }
 
-                await _commandService.SendArenaRoundEmbedAsync(_client, channel!, participantRolls, round);
+                await _embedService.SendArenaRoundEmbedAsync(ctx, participantRolls, round);
                 round++;
                 await Task.Delay(3000);
             }
 
             await _minefieldService.ResolveArenaAsync(winners);
-            await _commandService.SendArenaResolveEmbedAsync(_client, channel!, winners, arena.Payout);
+            await _embedService.SendArenaResolveEmbedAsync(ctx, winners, arena.Payout);
             return;
         }
     }
