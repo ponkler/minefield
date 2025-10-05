@@ -55,6 +55,23 @@ namespace Minefield.Commands
         [Command("help")]
         public async Task Help(CommandContext ctx) => await _embedService.SendHelpEmbedAsync(ctx);
 
+        [Command("immune"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
+        public async Task Immune(CommandContext ctx)
+        {
+            var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
+
+            await _minefieldService.ToggleImmunity(user);
+
+            if (user.IsImmune)
+            {
+                await ctx.RespondAsync($"You are now immune.");
+            }
+            else
+            {
+                await ctx.RespondAsync($"You are no longer immune.");
+            }
+        }
+
         [Command("info")]
         public async Task Info(CommandContext ctx) => await _embedService.SendInfoEmbedAsync(ctx);
 
@@ -183,6 +200,56 @@ namespace Minefield.Commands
 
             _minefieldService.ReviveUser(user);
             await ctx.RespondAsync($"{Formatter.Sanitize(user.Username)} has been revived.");
+        }
+
+        [Command("role")]
+        public async Task Role(CommandContext ctx)
+        {
+            await ctx.RespondAsync("You must enter the name of a role. Use \"!roles\" to see all valid role names.");
+            return;
+        }
+
+        [Command("role")]
+        public async Task Role(CommandContext ctx, string name)
+        {
+            var arenaRole = ctx.Guild.Roles.Select(r => r.Value).Where(u => u.Name == "Arena").First();
+            var cofferRole = ctx.Guild.Roles.Select(r => r.Value).Where(u => u.Name == "Coffer").First();
+
+            switch (name)
+            {
+                case "Arena":
+                    {
+                        if (ctx.Member!.Roles.Any(r => r.Name == "Arena")) 
+                        {
+                            await ctx.Member.RevokeRoleAsync(arenaRole);
+                            await ctx.RespondAsync("\"Arena\" role revoked.");
+                            return;
+                        }
+
+                        await ctx.Member.GrantRoleAsync(arenaRole);
+                        await ctx.RespondAsync("\"Arena\" role granted.");
+                        return;
+                    }
+                case "Coffer":
+                    {
+                        if (ctx.Member!.Roles.Any(r => r.Name == "Coffer"))
+                        {
+                            await ctx.Member.RevokeRoleAsync(cofferRole);
+                            await ctx.RespondAsync("\"Coffer\" role revoked.");
+                            return;
+                        }
+
+                        await ctx.Member.GrantRoleAsync(cofferRole);
+                        await ctx.RespondAsync("\"Coffer\" role granted.");
+                        return;
+                    } 
+            }
+        }
+
+        [Command("roles")]
+        public async Task Roles(CommandContext ctx)
+        {
+            await ctx.RespondAsync($"Available roles: \"Arena\", \"Coffer\"");
         }
 
         [Command("setbalance"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]

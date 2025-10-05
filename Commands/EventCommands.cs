@@ -1,5 +1,6 @@
 ﻿using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
+using Minefield.Entities;
 using Minefield.Services;
 
 namespace Minefield.Commands
@@ -58,6 +59,15 @@ namespace Minefield.Commands
             }
         }
 
+        [Command("coffer")]
+        public async Task Coffer(CommandContext ctx)
+        {
+            int sum = _minefieldService.Coffer.UserTickets.Sum(ut => ut.Value);
+            int required = _minefieldService.CalculateRequiredTicketsToOpenCoffer();
+
+            await ctx.RespondAsync($"There is currently {_minefieldService.Coffer.Amount:N0} MF$ in Charon's Coffer. {required} ticket sales are required to open the Coffer. {sum} tickets have been sold so far.");
+        }
+
         [Command("join")]
         public async Task Join(CommandContext ctx)
         {
@@ -84,6 +94,52 @@ namespace Minefield.Commands
             await _minefieldService.AddUserToArenaAsync(user);
             await ctx.RespondAsync($":crossed_swords: You have joined the Arena! :crossed_swords:");
 
+        }
+
+        [Command("tickets")]
+        public async Task Tickets(CommandContext ctx)
+        {
+            var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
+            var hasTickets = _minefieldService.Coffer.UserTickets.TryGetValue(user, out int tickets);
+
+            if (!hasTickets)
+            {
+                await ctx.RespondAsync($"You don't have any tickets for Charon's Coffer. Your next ticket will cost 20 MF$.");
+                return;
+            }
+
+            await ctx.RespondAsync($"You have {tickets} ticket(s) for Charon's Coffer. Your next ticket will cost {20 * (int)Math.Pow(2, tickets)} MF$.");
+        }
+
+        [Command("tickets")]
+        public async Task Tickets(CommandContext ctx, int amount)
+        {
+            var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
+
+            var result = await _minefieldService.BuyCofferTickets(user, amount);
+
+            if (result.Succeeded)
+            {
+                await ctx.RespondAsync($"You have purchased {amount:N0} tickets for {result.Cost:N0} MF$.");
+            }
+            else
+            {
+                await ctx.RespondAsync($"You need {result.Cost:N0} MF$ to buy {amount:N0} tickets. You only have {user.Currency:N0} MF$.");
+            }
+
+            if (_minefieldService.ShouldOpenCoffer())
+            {
+                await _embedService.SendCofferReadyToOpenEmbedAsync(ctx);
+                MinefieldUser winner = _minefieldService.GetCofferWinner();
+                await Task.Delay(3000);
+                await _embedService.SendCofferPayoutEmbedAsync(ctx, winner);
+
+                winner.Currency += _minefieldService.Coffer.Amount;
+                winner.LifetimeCurrency += _minefieldService.Coffer.Amount;
+                await _userService.SaveAsync();
+
+                _minefieldService.ResetCoffer();
+            }
         }
     }
 }

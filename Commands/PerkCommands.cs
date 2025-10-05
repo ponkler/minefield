@@ -225,6 +225,7 @@ namespace Minefield.Commands
             {
                 var lifelineName = Formatter.Sanitize(target.Username);
                 await ctx.RespondAsync($":drop_of_blood: Lifeline activated! You have revived {lifelineName} and you will both receive the earnings of their next 10 messages. :drop_of_blood:");
+                await ctx.Channel.SendMessageAsync($"{(await ctx.Guild.GetMemberAsync(target.UserId)).Mention}, you have been revived.");
             }
             else
             {

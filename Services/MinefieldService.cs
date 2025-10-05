@@ -10,6 +10,8 @@ namespace Minefield.Services
 
         private Arena? Arena;
 
+        public Coffer Coffer = new Coffer();
+
         public event Func<CommandContext, Arena, Task>? ArenaStarted;
 
         public readonly Dictionary<string, int> perkCosts = new Dictionary<string, int>
@@ -36,6 +38,11 @@ namespace Minefield.Services
         public MinefieldService(UserService userService)
         {
             _userService = userService;
+
+            if (Coffer.Amount == 0)
+            {
+                Coffer.Amount = _rng.Next(160, 320);
+            }
         }
 
         public async Task<RollResult> ProcessMessageAsync(MinefieldUser user)
@@ -437,6 +444,85 @@ namespace Minefield.Services
             UserRevived?.Invoke(user);
         }
 
+        public async Task ToggleImmunity(MinefieldUser user)
+        {
+            user.IsImmune = !user.IsImmune;
+            await _userService.SaveAsync();
+        }
+
+        public async Task<(bool Succeeded, int Cost)> BuyCofferTickets(MinefieldUser user, int amount)
+        {
+            var hasTickets = Coffer.UserTickets.TryGetValue(user, out int tickets);
+            int cost = CalculateTicketCost(tickets, amount);
+
+            if (user.Currency < cost)
+            {
+                return (false, cost);
+            }
+
+            user.Currency -= cost;
+
+            if (hasTickets)
+            {
+                Coffer.UserTickets[user] += amount;
+            }
+            else
+            {
+                Coffer.UserTickets[user] = amount;
+            }
+
+            await _userService.SaveAsync();
+            return (true, cost);
+        }
+
+        public int CalculateTicketCost(int purchased, int purchasing)
+        {
+            return (20 * (int)Math.Pow(2, purchased)) * (int)(Math.Pow(2, purchasing) - 1);
+        }
+
+        public int CalculateRequiredTicketsToOpenCoffer()
+        {
+            return (int)Math.Ceiling(Math.Log2((Coffer.Amount / 20) + 1) + 2);
+        }
+
+        public bool ShouldOpenCoffer()
+        {
+            var required = CalculateRequiredTicketsToOpenCoffer();
+            var sum = Coffer.UserTickets.Sum(ut => ut.Value);
+
+            if (sum >= required)
+            {
+                Coffer.Opening = true;
+                return true;
+            }
+
+            Coffer.Opening = false;
+            return false;
+        }
+
+        public MinefieldUser GetCofferWinner()
+        {
+            int sum = Coffer.UserTickets.Values.Sum();
+            int winner = _rng.Next(sum);
+            int cumulative = 0;
+
+            foreach (var entry in Coffer.UserTickets)
+            {
+                cumulative += entry.Value;
+                if (winner < cumulative) { return entry.Key; }
+            }
+
+            return null!;
+        }
+
+        public void ResetCoffer()
+        {
+            Coffer.UserTickets.Clear();
+            Coffer.Opening = false;
+
+            Coffer.Amount = _rng.Next(160, 320);
+        }
+
         public async Task<List<(MinefieldUser provider, MinefieldUser target)>> GetUserSacrificeChain(MinefieldUser user)
         {
             List<(MinefieldUser provider, MinefieldUser target)> sacrifices = new List<(MinefieldUser provider, MinefieldUser target)>();
@@ -563,5 +649,12 @@ namespace Minefield.Services
         public int BuyIn { get; set; }
         public int Payout { get; set; }
         public List<MinefieldUser> Participants { get; set; } = new List<MinefieldUser>();
+    }
+
+    public class Coffer
+    {
+        public int Amount { get; set; } = 0;
+        public Dictionary<MinefieldUser, int> UserTickets = new Dictionary<MinefieldUser, int>();
+        public bool Opening { get; set; } = false;
     }
 }

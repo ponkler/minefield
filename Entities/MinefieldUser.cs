@@ -13,6 +13,7 @@
         public int LifetimeCurrency { get; set; } = 0;
         public int TotalMessages { get; set; } = 0;
         public bool IsAlive { get; set; } = true;
+        public bool IsImmune { get; set; } = false;
 
 
         // PERKS ACTIVE

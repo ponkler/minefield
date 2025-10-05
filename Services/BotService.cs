@@ -70,14 +70,16 @@ namespace Minefield.Services
 
         private async Task OnMessageCreatedAsync(DiscordClient sender, MessageCreateEventArgs e)
         {
+            var user = await _userService.GetOrCreateUserAsync(e.Author.Id, e.Guild.Id, e.Author.Username);
             var channel = await GetMinefieldChannelAsync(e.Guild.Id);
-            if (e.Author.IsBot || channel == null || e.Message.Channel.Id != channel.Id) { return; }
+            if (e.Author.IsBot || channel == null || e.Message.Channel.Id != channel.Id || user.IsImmune) { return; }
 
             if (e.Message.Content.StartsWith("!"))
                 return;
             else
             {
-                var user = await _userService.GetOrCreateUserAsync(e.Author.Id, e.Guild.Id, e.Author.Username);
+                _minefieldService.Coffer.Amount += 5;
+                user = await _userService.GetOrCreateUserAsync(e.Author.Id, e.Guild.Id, e.Author.Username);
                 RollResult result = await _minefieldService.ProcessMessageAsync(user);
 
                 if (result.Roll == 0)
@@ -152,6 +154,7 @@ namespace Minefield.Services
             if (user.SacrificeTarget != null) { await _minefieldService.RemoveSacrificeAsync(user, user.SacrificeTarget); }
             if (user.SacrificeProvider != null) { await _minefieldService.RemoveSacrificeAsync(user.SacrificeProvider, user); }
 
+            _minefieldService.Coffer.Amount += user.Currency / 2;
             user.Currency /= 2;
 
             var server = await _client.GetGuildAsync(user.ServerId);

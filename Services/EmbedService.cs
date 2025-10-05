@@ -27,7 +27,7 @@ namespace Minefield.Services
                 .WithColor(DiscordColor.IndianRed)
                 .AddField("__Details__", str, false);
 
-            await ctx.RespondAsync(embed: arenaStartedEmbed);
+            await ctx.Channel.SendMessageAsync(content: $"{ctx.Guild.Roles.Select(r => r.Value).Where(r => r.Name == "Arena").First().Mention}", embed: arenaStartedEmbed);
         }
 
         public async Task SendArenaCancelledEmbedAsync(CommandContext ctx)
@@ -75,7 +75,7 @@ namespace Minefield.Services
                 .WithColor(DiscordColor.IndianRed)
                 .AddField("__List__", string.Join("\n", users), false)
                 .AddField("__Payout__", $"\t• {payout:N0} MF$");
-
+            
             await ctx.Channel.SendMessageAsync(embed: arenaResolveEmbed);
         }
 
@@ -99,6 +99,35 @@ namespace Minefield.Services
                 .AddField("__Winners__", string.Join("\n", payoutStrings), false);
 
             await ctx.Channel.SendMessageAsync(embed: arenaResolveEmbed);
+        }
+
+        public async Task SendCofferReadyToOpenEmbedAsync(CommandContext ctx)
+        {
+            List<string> entryStrings = new List<string>();
+            DiscordRole cofferRole = ctx.Guild.Roles.Select(r => r.Value).Where(r => r.Name == "Coffer").First();
+
+            foreach (var entry in _minefieldService.Coffer.UserTickets)
+            {
+                string str = $"\t• {Formatter.Sanitize(entry.Key.Username)}, Tickets: {entry.Value}";
+                entryStrings.Add(str);
+            }
+
+            var cofferReadyEmbed = new DiscordEmbedBuilder()
+                .WithTitle(":urn: Coffer Opening :urn:")
+                .WithColor(DiscordColor.Aquamarine)
+                .AddField("__Entrants__", string.Join("\n", entryStrings));
+
+            await ctx.Channel.SendMessageAsync(content: cofferRole.Mention, embed: cofferReadyEmbed);
+        }
+
+        public async Task SendCofferPayoutEmbedAsync(CommandContext ctx, MinefieldUser winner)
+        {
+            var cofferWinnerEmbed = new DiscordEmbedBuilder()
+                .WithTitle(":gem: Coffer Winner :gem:")
+                .WithColor(DiscordColor.Aquamarine)
+                .AddField("__Winner__", $"{Formatter.Sanitize(winner.Username)} has opened Charon's Coffer and won {_minefieldService.Coffer.Amount:N0} MF$.");
+
+            await ctx.RespondAsync(embed: cofferWinnerEmbed);
         }
 
         public async Task SendCooldownEmbedAsync(CommandContext ctx, MinefieldUser user)
@@ -228,8 +257,8 @@ namespace Minefield.Services
                 $"{(targetUser.SymbioteTarget != null ? ":link:" : "")}";
 
             var embed = new DiscordEmbedBuilder()
-                .WithTitle($"{(targetUser.IsAlive ? ":heart:" : ":headstone:")} {Formatter.Sanitize(targetUser.Username)} {perkString}")
-                .WithColor(targetUser.IsAlive ? DiscordColor.Green : DiscordColor.Red)
+                .WithTitle($"{(targetUser.IsAlive ? targetUser.IsImmune ? ":moyai:" : ":heart:" : ":headstone:")} {Formatter.Sanitize(targetUser.Username)} {perkString}")
+                .WithColor(targetUser.IsAlive ? targetUser.IsImmune ? DiscordColor.Gray : DiscordColor.Green : DiscordColor.Red)
                 .AddField("__Stats__",
                     $"\t• **Odds:** 1 in {targetUser.CurrentOdds}\n" +
                     $"\t• **Max Odds:** 1 in {targetUser.MaxOdds}\n" +
@@ -282,17 +311,24 @@ namespace Minefield.Services
                 )
                 .AddField("__Events__",
                     $"\t• **!arena <amount>** — Starts an arena with the given amount as the buy in.\n" +
-                    $"\t• **!join** — Joins an active arena."
+                    $"\t• **!join** — Joins an active arena.\n" +
+                    $"\t• **!coffer** — Show info about Charon's Coffer.\n" +
+                    $"\t• **!tickets** — Show info about Coffer tickets.\n" +
+                    $"\t• **!tickets <amount>** — Purchase a number of Coffer tickets."
                 )
-                .AddField("__Utility__",
+                .AddField("__Utility (Part 1)__",
                     $"\t• **!balance [username]** — Show a user's current MF$.\n" +
                     $"\t• **!cooldowns [username]** — Shows the number of messages you must send before you can activate certain perks again.\n" +
-                    $"\t• **!deadusers** — Show a list of the usernames of all dead users.\n" +
+                    $"\t• **!deadusers / !dead** — Show a list of the usernames of all dead users.\n" +
                     $"\t• **!help** — Show this help message.\n" +
                     $"\t• **!info** — Show general information and tips about the minefield.\n" +
                     $"\t• **!maxodds [username]** — Shows a user's max odds.\n" +
                     $"\t• **!odds [username]** — Show a user's current odds.\n" +
                     $"\t• **!perks** — Show all perk prices and descriptions.\n" +
+                    $"\t• **!role <role name>** — Grants or revokes a Minefield role.\n" +
+                    $"\t• **!roles** — Show all valid Minefield role names."
+                )
+                .AddField("__Utility (Part 2)__",
                     $"\t• **!status [username]** — View a user's active perks, current streak, odds, and MF$.\n" +
                     $"\t• **!streak [username]** — Show a user's current streak.\n" +
                     $"\t• **!users** — Show a list of the usernames of all users in the server."
@@ -301,6 +337,7 @@ namespace Minefield.Services
                     $"\t• **!endlifeline [username]** — Unbinds a user from their Lifeline target.\n" +
                     $"\t• **!endsacrifice [username]** — Unbinds a user from their Sacrifice target.\n" +
                     $"\t• **!endsymbiote [username]** — Unbinds a user from their Symbiote target.\n" +
+                    $"\t• **!immune** — Toggles Minefield immunity.\n" +
                     $"\t• **!setbalance [username] <amount>** — Sets a user's balance to the given amount.\n" +
                     $"\t• **!setmaxodds [username] <amount>** — Sets a user's max odds to the given amount.\n" +
                     $"\t• **!setodds [username] <amount>** — Sets a user's odds to the given amount.\n" +
