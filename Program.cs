@@ -5,7 +5,6 @@ using DSharpPlus.Interactivity;
 using DSharpPlus.Interactivity.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Minefield;
 using Minefield.Commands;
 using Minefield.Data;
 using Minefield.Services;

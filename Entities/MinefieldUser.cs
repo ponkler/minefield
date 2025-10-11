@@ -15,6 +15,8 @@
         public bool IsAlive { get; set; } = true;
         public bool IsImmune { get; set; } = false;
 
+        public int MessagesSinceCoinFlip { get; set; } = 5;
+
 
         // PERKS ACTIVE
         public int AegisCharges { get; set; } = 0;

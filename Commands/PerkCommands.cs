@@ -1,6 +1,7 @@
 ﻿using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
+using DSharpPlus.Entities;
 using Minefield.Services;
 
 namespace Minefield.Commands
@@ -55,14 +56,14 @@ namespace Minefield.Commands
         }
 
         [Command("deathpact")]
-        public async Task DeathPact(CommandContext ctx, string username)
+        public async Task DeathPact(CommandContext ctx, DiscordMember member)
         {
             var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
-            var target = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var target = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (target == null) 
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -179,14 +180,14 @@ namespace Minefield.Commands
         }
 
         [Command("lifeline")]
-        public async Task Lifeline(CommandContext ctx, string username)
+        public async Task Lifeline(CommandContext ctx, DiscordMember member)
         {
             var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
-            var target = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var target = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (target == null)
             {
-                await ctx.RespondAsync("You must specify a target.");
+                await ctx.RespondAsync($"Could not find user {member.Username}.");
                 return;
             }
 
@@ -297,14 +298,14 @@ namespace Minefield.Commands
         }
 
         [Command("sacrifice")]
-        public async Task Sacrifice(CommandContext ctx, string username)
+        public async Task Sacrifice(CommandContext ctx, DiscordMember member)
         {
             var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
-            var target = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var target = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (target == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -357,10 +358,10 @@ namespace Minefield.Commands
         }
 
         [Command("symbiote")]
-        public async Task Symbiote(CommandContext ctx, string username)
+        public async Task Symbiote(CommandContext ctx, DiscordMember member)
         {
             var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
-            var target = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var target = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user.SymbioteTarget != null)
             {
@@ -370,7 +371,7 @@ namespace Minefield.Commands
 
             if (target == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -421,13 +422,13 @@ namespace Minefield.Commands
         }
 
         [Command("endlifeline"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
-        public async Task EndLifeline(CommandContext ctx, string username)
+        public async Task EndLifeline(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -440,7 +441,7 @@ namespace Minefield.Commands
             var lifelineName = Formatter.Sanitize(user.LifelineTarget.Username);
             await _minefieldService.RemoveLifelineAsync(user, user.LifelineTarget);
 
-            await ctx.RespondAsync($"You have ended {username}'s Lifeline with {lifelineName}.");
+            await ctx.RespondAsync($"You have ended {member.Username}'s Lifeline with {lifelineName}.");
         }
 
         [Command("endsacrifice"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
@@ -461,13 +462,13 @@ namespace Minefield.Commands
         }
 
         [Command("endsacrifice"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
-        public async Task EndSacrifice(CommandContext ctx, string username)
+        public async Task EndSacrifice(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -480,7 +481,7 @@ namespace Minefield.Commands
             var sacrificeName = Formatter.Sanitize(user.SacrificeTarget.Username);
             await _minefieldService.RemoveSymbioteAsync(user, user.SacrificeTarget);
 
-            await ctx.RespondAsync($"{username} is no longer a Sacrifice for {sacrificeName}.");
+            await ctx.RespondAsync($"{member.Username} is no longer a Sacrifice for {sacrificeName}.");
         }
 
         [Command("endsymbiote"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
@@ -501,13 +502,13 @@ namespace Minefield.Commands
         }
 
         [Command("endsymbiote"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
-        public async Task EndSymbiote(CommandContext ctx, string username)
+        public async Task EndSymbiote(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -520,7 +521,7 @@ namespace Minefield.Commands
             var symbioteName = Formatter.Sanitize(user.SymbioteTarget.Username);
             await _minefieldService.RemoveSymbioteAsync(user, user.SymbioteTarget);
 
-            await ctx.RespondAsync($"You have ended {username}'s Symbiote with {symbioteName}.");
+            await ctx.RespondAsync($"You have ended {member.Username}'s Symbiote with {symbioteName}.");
         }
     }
 }

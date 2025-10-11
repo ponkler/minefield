@@ -1,6 +1,7 @@
 ﻿using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
+using DSharpPlus.Entities;
 using Minefield.Services;
 
 namespace Minefield.Commands
@@ -28,13 +29,13 @@ namespace Minefield.Commands
         }
 
         [Command("balance")]
-        public async Task Balance(CommandContext ctx, string username)
+        public async Task Balance(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null) 
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -104,13 +105,13 @@ namespace Minefield.Commands
         }
 
         [Command("maxodds")]
-        public async Task MaxOdds(CommandContext ctx, string username)
+        public async Task MaxOdds(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -126,13 +127,13 @@ namespace Minefield.Commands
         }
 
         [Command("odds")]
-        public async Task Odds(CommandContext ctx, string username)
+        public async Task Odds(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -152,13 +153,13 @@ namespace Minefield.Commands
         }
 
         [Command("reset"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
-        public async Task Reset(CommandContext ctx, string username)
+        public async Task Reset(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -182,13 +183,13 @@ namespace Minefield.Commands
         }
 
         [Command("revive"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
-        public async Task Revive(CommandContext ctx, string username)
+        public async Task Revive(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -210,12 +211,12 @@ namespace Minefield.Commands
         }
 
         [Command("role")]
-        public async Task Role(CommandContext ctx, string name)
+        public async Task Role(CommandContext ctx, DiscordRole role)
         {
             var arenaRole = ctx.Guild.Roles.Select(r => r.Value).Where(u => u.Name == "Arena").First();
             var cofferRole = ctx.Guild.Roles.Select(r => r.Value).Where(u => u.Name == "Coffer").First();
 
-            switch (name)
+            switch (role.Name)
             {
                 case "Arena":
                     {
@@ -242,7 +243,12 @@ namespace Minefield.Commands
                         await ctx.Member.GrantRoleAsync(cofferRole);
                         await ctx.RespondAsync("\"Coffer\" role granted.");
                         return;
-                    } 
+                    }
+                default:
+                    {
+                        await ctx.RespondAsync("Invalid role.");
+                        return;
+                    }
             }
         }
 
@@ -270,13 +276,13 @@ namespace Minefield.Commands
         }
 
         [Command("setbalance"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
-        public async Task SetBalance(CommandContext ctx, string username, int balance)
+        public async Task SetBalance(CommandContext ctx, DiscordMember member, int balance)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -311,13 +317,13 @@ namespace Minefield.Commands
         }
 
         [Command("setmaxodds"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
-        public async Task SetMaxOdds(CommandContext ctx, string username, int max)
+        public async Task SetMaxOdds(CommandContext ctx, DiscordMember member, int max)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -352,13 +358,13 @@ namespace Minefield.Commands
         }
 
         [Command("setodds"), RequireRoles(RoleCheckMode.MatchNames, "Minefield Janitor")]
-        public async Task SetOdds(CommandContext ctx, string username, int odds)
+        public async Task SetOdds(CommandContext ctx, DiscordMember member, int odds)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -383,13 +389,13 @@ namespace Minefield.Commands
         }
 
         [Command("status")]
-        public async Task Status(CommandContext ctx, string username)
+        public async Task Status(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 
@@ -405,13 +411,13 @@ namespace Minefield.Commands
         }
 
         [Command("streak")]
-        public async Task Streak(CommandContext ctx, string username)
+        public async Task Streak(CommandContext ctx, DiscordMember member)
         {
-            var user = await _userService.GetUserByUsernameAsync(username, ctx.Guild.Id);
+            var user = await _userService.GetUserAsync(member.Id, ctx.Guild.Id);
 
             if (user == null)
             {
-                await ctx.RespondAsync($"Could not find user {username}");
+                await ctx.RespondAsync($"Could not find user {member.Username}");
                 return;
             }
 

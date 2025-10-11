@@ -33,6 +33,14 @@ namespace Minefield.Services
             { "guardian", 15 }
         };
 
+        public int flipCooldown = 5;
+        public enum FlipResult
+        {
+            Win,
+            Loss,
+            Boom
+        }
+
         public event Func<MinefieldUser, Task>? UserRevived;
 
         public MinefieldService(UserService userService)
@@ -57,6 +65,7 @@ namespace Minefield.Services
 
             if (user.AegisCharges == 0) { user.MessagesSinceAegis++; }
             if (!user.HasGuardian) { user.MessagesSinceGuardian++; }
+            user.MessagesSinceCoinFlip++;
 
             int currencyToAdd = CalculateEarnings(user);
             await GiveCurrencyAsync(user, currencyToAdd);
@@ -521,6 +530,30 @@ namespace Minefield.Services
             Coffer.Opening = false;
 
             Coffer.Amount = _rng.Next(160, 320);
+        }
+
+        public async Task<FlipResult> FlipCoin(MinefieldUser user)
+        {
+            user.MessagesSinceCoinFlip = 0;
+
+            var result = _rng.Next(1, 21);
+
+            if (result == 20)
+            {
+                user.MessagesSinceCoinFlip = -15;
+                return FlipResult.Boom;
+            }
+            else if (result > 10)
+            {
+                user.Currency += 100;
+                user.LifetimeCurrency += 50;
+                await _userService.SaveAsync();
+                return FlipResult.Win;
+            }
+            else
+            {
+                return FlipResult.Loss;
+            }
         }
 
         public async Task<List<(MinefieldUser provider, MinefieldUser target)>> GetUserSacrificeChain(MinefieldUser user)

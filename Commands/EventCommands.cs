@@ -141,5 +141,49 @@ namespace Minefield.Commands
                 _minefieldService.ResetCoffer();
             }
         }
+
+        [Command("flip")]
+        public async Task Flip(CommandContext ctx) 
+        {
+            var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
+
+            if (user.Currency < 50)
+            {
+                await ctx.RespondAsync($"Flips cost 50 MF$. You only have {user.Currency:N0} MF$.");
+                return;
+            }
+
+            if (user.MessagesSinceCoinFlip < _minefieldService.flipCooldown)
+            {
+                await ctx.RespondAsync($"You must send {_minefieldService.flipCooldown - (user.MessagesSinceCoinFlip)} more messages before you can Flip again.");
+                return;
+            }
+
+            user.Currency -= 50;
+            await _userService.SaveAsync();
+
+            var result = await _minefieldService.FlipCoin(user);
+
+            switch (result)
+            {
+                case MinefieldService.FlipResult.Boom:
+                    {
+                        await ctx.RespondAsync(":boom: Flip exploded! You must send 20 messages before you can flip again.");
+                    }
+                    break;
+                case MinefieldService.FlipResult.Win:
+                    {
+                        await ctx.RespondAsync(":crown: Flip won! You have earned 100 MF$. You must send 5 messages before you can flip again.");
+                    }
+                    break;
+                case MinefieldService.FlipResult.Loss:
+                    {
+                        await ctx.RespondAsync(":coffin: Flip lost! You have lost 50 MF$. You must send 5 messages before you can flip again.");
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 }
