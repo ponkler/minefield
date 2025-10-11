@@ -105,6 +105,12 @@ namespace Minefield.Services
                     {
                         deadUser.HasGuardian = false;
                         await e.Message.RespondAsync(":angel::boom::angel:");
+
+                        if (sacrificed)
+                        {
+                            await _minefieldService.RemoveSacrificeAsync(deadUser, deadUser.SacrificeTarget);
+                            await _userService.SaveAsync();
+                        }
                     }
                     else
                     {
@@ -178,8 +184,9 @@ namespace Minefield.Services
 
         private async Task HandleUserSacrificeAsync(MinefieldUser user)
         {
-            await _minefieldService.RemoveAllUserRelevantPerks(user);
             user.Currency /= 2;
+
+            await _minefieldService.RemoveAllUserRelevantPerks(user);
 
             var server = await _client.GetGuildAsync(user.ServerId);
             var channel = await GetMinefieldChannelAsync(user.ServerId);
