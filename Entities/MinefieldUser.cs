@@ -62,5 +62,8 @@
         public ulong? SymbioteProviderId { get; set; }
         public ulong? SymbioteProviderServerId { get; set; }
         public MinefieldUser? SymbioteProvider { get; set; }
+
+        // JOIN PROPERTIES
+        public List<CofferTicket> CofferTickets { get; set; } = new List<CofferTicket>();
     }
 }

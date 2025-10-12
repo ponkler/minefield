@@ -5,6 +5,7 @@ using DSharpPlus.Interactivity;
 using DSharpPlus.Interactivity.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Minefield;
 using Minefield.Commands;
 using Minefield.Data;
 using Minefield.Services;
@@ -17,12 +18,10 @@ namespace MinefieldDev
         {
             var services = new ServiceCollection();
 
-            /*
             var root = Directory.GetCurrentDirectory();
             var dotenv = Path.Combine(root, ".env");
 
             DotEnv.Load(dotenv);
-            */
 
             services.AddDbContext<MinefieldDbContext>(options =>
                 options.UseSqlite($"Data Source={Environment.GetEnvironmentVariable("DB_PATH")}")
@@ -42,6 +41,7 @@ namespace MinefieldDev
 
             services.AddScoped<EmbedService>();
             services.AddScoped<UserService>();
+            services.AddScoped<CofferService>();
             services.AddScoped<MinefieldService>();
             services.AddScoped<BotService>();
 

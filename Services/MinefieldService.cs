@@ -1,16 +1,16 @@
 ﻿using DSharpPlus.CommandsNext;
 using Minefield.Entities;
+using System.Threading.Tasks;
 
 namespace Minefield.Services
 {
     public class MinefieldService
     {
         private readonly UserService _userService;
+        private readonly CofferService _cofferService;
         private readonly Random _rng = new Random();
 
         private Arena? Arena;
-
-        public Coffer Coffer = new Coffer();
 
         public event Func<CommandContext, Arena, Task>? ArenaStarted;
 
@@ -34,6 +34,7 @@ namespace Minefield.Services
         };
 
         public int flipCooldown = 5;
+
         public enum FlipResult
         {
             Win,
@@ -43,14 +44,10 @@ namespace Minefield.Services
 
         public event Func<MinefieldUser, Task>? UserRevived;
 
-        public MinefieldService(UserService userService)
+        public MinefieldService(UserService userService, CofferService cofferService)
         {
             _userService = userService;
-
-            if (Coffer.Amount == 0)
-            {
-                Coffer.Amount = _rng.Next(160, 320);
-            }
+            _cofferService = cofferService;
         }
 
         public async Task<RollResult> ProcessMessageAsync(MinefieldUser user)
@@ -461,7 +458,7 @@ namespace Minefield.Services
 
         public async Task<(bool Succeeded, int Cost)> BuyCofferTickets(MinefieldUser user, int amount)
         {
-            var hasTickets = Coffer.UserTickets.TryGetValue(user, out int tickets);
+            var tickets = await _cofferService.GetUserTicketCountAsync(user);
             int cost = CalculateTicketCost(tickets, amount);
 
             if (user.Currency < cost)
@@ -471,15 +468,7 @@ namespace Minefield.Services
 
             user.Currency -= cost;
 
-            if (hasTickets)
-            {
-                Coffer.UserTickets[user] += amount;
-            }
-            else
-            {
-                Coffer.UserTickets[user] = amount;
-            }
-
+            await _cofferService.AddUserTicketsAsync(user, amount);
             await _userService.SaveAsync();
             return (true, cost);
         }
@@ -489,47 +478,45 @@ namespace Minefield.Services
             return (20 * (int)Math.Pow(2, purchased)) * (int)(Math.Pow(2, purchasing) - 1);
         }
 
-        public int CalculateRequiredTicketsToOpenCoffer()
+        public async Task<int> CalculateRequiredTicketsToOpenCofferAsync(ulong serverId)
         {
-            return (int)Math.Ceiling(Math.Log2((Coffer.Amount / 20) + 1) + 2);
+            return (int)Math.Ceiling(Math.Log2((await _cofferService.GetCofferAmountAsync(serverId) / 20) + 1) + 2);
         }
 
-        public bool ShouldOpenCoffer()
+        public async Task<bool> ShouldOpenCoffer(ulong serverId)
         {
-            var required = CalculateRequiredTicketsToOpenCoffer();
-            var sum = Coffer.UserTickets.Sum(ut => ut.Value);
+            var required = await CalculateRequiredTicketsToOpenCofferAsync(serverId);
+            var sum = await _cofferService.GetCofferTicketSaleCountAsync(serverId);
 
             if (sum >= required)
             {
-                Coffer.Opening = true;
                 return true;
             }
 
-            Coffer.Opening = false;
             return false;
         }
 
-        public MinefieldUser GetCofferWinner()
+        public async Task<MinefieldUser> GetCofferWinner(ulong serverId)
         {
-            int sum = Coffer.UserTickets.Values.Sum();
+            int sum = await _cofferService.GetCofferTicketSaleCountAsync(serverId);
             int winner = _rng.Next(sum);
             int cumulative = 0;
 
-            foreach (var entry in Coffer.UserTickets)
+            foreach (var entry in await _cofferService.GetUserTicketsAsync(serverId))
             {
-                cumulative += entry.Value;
-                if (winner < cumulative) { return entry.Key; }
+                cumulative += entry.Amount;
+                if (winner < cumulative) { return entry.User; }
             }
 
             return null!;
         }
 
-        public void ResetCoffer()
+        public async Task ResetCoffer(ulong serverId)
         {
-            Coffer.UserTickets.Clear();
-            Coffer.Opening = false;
+            await _cofferService.ClearTicketsAsync(serverId);
 
-            Coffer.Amount = _rng.Next(160, 320);
+            await _cofferService.SetCofferAmountAsync(serverId, 0);
+            await _cofferService.ToggleCofferOpening(serverId);
         }
 
         public async Task<FlipResult> FlipCoin(MinefieldUser user)
@@ -682,12 +669,5 @@ namespace Minefield.Services
         public int BuyIn { get; set; }
         public int Payout { get; set; }
         public List<MinefieldUser> Participants { get; set; } = new List<MinefieldUser>();
-    }
-
-    public class Coffer
-    {
-        public int Amount { get; set; } = 0;
-        public Dictionary<MinefieldUser, int> UserTickets = new Dictionary<MinefieldUser, int>();
-        public bool Opening { get; set; } = false;
     }
 }

@@ -8,11 +8,13 @@ namespace Minefield.Services
 {
     public class EmbedService
     {
+        private readonly CofferService _cofferService;
         private readonly MinefieldService _minefieldService;
         private readonly UserService _userService;
 
-        public EmbedService(MinefieldService minefieldService, UserService userService) 
+        public EmbedService(CofferService cofferService, MinefieldService minefieldService, UserService userService) 
         {
+            _cofferService = cofferService;
             _minefieldService = minefieldService;
             _userService = userService;
         }
@@ -106,9 +108,9 @@ namespace Minefield.Services
             List<string> entryStrings = new List<string>();
             DiscordRole cofferRole = ctx.Guild.Roles.Select(r => r.Value).Where(r => r.Name == "Coffer").First();
 
-            foreach (var entry in _minefieldService.Coffer.UserTickets)
+            foreach (var entry in await _cofferService.GetUserTicketsAsync(ctx.Guild.Id))
             {
-                string str = $"\t• {Formatter.Sanitize(entry.Key.Username)}, Tickets: {entry.Value}";
+                string str = $"\t• {Formatter.Sanitize(entry.User.Username)}, Tickets: {entry.Amount}";
                 entryStrings.Add(str);
             }
 
@@ -125,7 +127,7 @@ namespace Minefield.Services
             var cofferWinnerEmbed = new DiscordEmbedBuilder()
                 .WithTitle(":gem: Coffer Winner :gem:")
                 .WithColor(DiscordColor.Aquamarine)
-                .AddField("__Winner__", $"{Formatter.Sanitize(winner.Username)} has opened Charon's Coffer and won {_minefieldService.Coffer.Amount:N0} MF$.");
+                .AddField("__Winner__", $"{Formatter.Sanitize(winner.Username)} has opened Charon's Coffer and won {await _cofferService.GetCofferAmountAsync(ctx.Guild.Id):N0} MF$.");
 
             await ctx.RespondAsync(embed: cofferWinnerEmbed);
         }

@@ -7,13 +7,15 @@ namespace Minefield.Commands
 {
     public class EventCommands : BaseCommandModule
     {
+        private readonly CofferService _cofferService;
         private readonly MinefieldService _minefieldService;
         private readonly UserService _userService;
 
         private readonly EmbedService _embedService;
 
-        public EventCommands(MinefieldService minefieldService, UserService userService, EmbedService embedService)
+        public EventCommands(CofferService cofferService, MinefieldService minefieldService, UserService userService, EmbedService embedService)
         {
+            _cofferService = cofferService;
             _minefieldService = minefieldService;
             _userService = userService;
             _embedService = embedService;
@@ -62,10 +64,10 @@ namespace Minefield.Commands
         [Command("coffer")]
         public async Task Coffer(CommandContext ctx)
         {
-            int sum = _minefieldService.Coffer.UserTickets.Sum(ut => ut.Value);
-            int required = _minefieldService.CalculateRequiredTicketsToOpenCoffer();
+            int sum = await _cofferService.GetCofferTicketSaleCountAsync(ctx.Guild.Id);
+            int required = await _minefieldService.CalculateRequiredTicketsToOpenCofferAsync(ctx.Guild.Id);
 
-            await ctx.RespondAsync($"There is currently {_minefieldService.Coffer.Amount:N0} MF$ in Charon's Coffer. {required} ticket sales are required to open the Coffer. {sum} tickets have been sold so far.");
+            await ctx.RespondAsync($"There is currently {await _cofferService.GetCofferAmountAsync(ctx.Guild.Id):N0} MF$ in Charon's Coffer. {required} ticket sales are required to open the Coffer. {sum} tickets have been sold so far.");
         }
 
         [Command("join")]
@@ -100,7 +102,8 @@ namespace Minefield.Commands
         public async Task Tickets(CommandContext ctx)
         {
             var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
-            var hasTickets = _minefieldService.Coffer.UserTickets.TryGetValue(user, out int tickets);
+            var hasTickets = await _cofferService.CheckIfUserHasTicketsAsync(user);
+            var tickets = await _cofferService.GetUserTicketCountAsync(user);
 
             if (!hasTickets)
             {
@@ -116,6 +119,12 @@ namespace Minefield.Commands
         {
             var user = await _userService.GetOrCreateUserAsync(ctx.User.Id, ctx.Guild.Id, ctx.User.Username);
 
+            if ((await _cofferService.GetOrCreateCofferAsync(ctx.Guild.Id)).Opening)
+            {
+                await ctx.RespondAsync($"The coffer is already opening. You can't buy tickets.");
+                return;
+            }
+
             var result = await _minefieldService.BuyCofferTickets(user, amount);
 
             if (result.Succeeded)
@@ -127,18 +136,19 @@ namespace Minefield.Commands
                 await ctx.RespondAsync($"You need {result.Cost:N0} MF$ to buy {amount:N0} tickets. You only have {user.Currency:N0} MF$.");
             }
 
-            if (_minefieldService.ShouldOpenCoffer())
+            if (await _minefieldService.ShouldOpenCoffer(ctx.Guild.Id))
             {
+                await _cofferService.ToggleCofferOpening(ctx.Guild.Id);
                 await _embedService.SendCofferReadyToOpenEmbedAsync(ctx);
-                MinefieldUser winner = _minefieldService.GetCofferWinner();
+                MinefieldUser winner = await _minefieldService.GetCofferWinner(ctx.Guild.Id);
                 await Task.Delay(3000);
                 await _embedService.SendCofferPayoutEmbedAsync(ctx, winner);
 
-                winner.Currency += _minefieldService.Coffer.Amount;
-                winner.LifetimeCurrency += _minefieldService.Coffer.Amount;
+                winner.Currency += await _cofferService.GetCofferAmountAsync(ctx.Guild.Id);
+                winner.LifetimeCurrency += await _cofferService.GetCofferAmountAsync(ctx.Guild.Id);
                 await _userService.SaveAsync();
 
-                _minefieldService.ResetCoffer();
+                await _minefieldService.ResetCoffer(ctx.Guild.Id);
             }
         }
 

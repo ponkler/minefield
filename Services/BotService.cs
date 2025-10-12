@@ -11,6 +11,7 @@ namespace Minefield.Services
         private readonly DiscordClient _client;
         private readonly EmbedService _embedService;
         private readonly MinefieldService _minefieldService;
+        private readonly CofferService _cofferService;
         private readonly UserService _userService;
 
         private readonly List<string> CloseCallMessages = new List<string>
@@ -23,12 +24,13 @@ namespace Minefield.Services
         };
 
         public BotService(DiscordClient client, EmbedService embedService,
-            MinefieldService minefieldService, UserService userService)
+            MinefieldService minefieldService, UserService userService, CofferService cofferService)
         {
             _client = client;
             _embedService = embedService;
             _minefieldService = minefieldService;
             _userService = userService;
+            _cofferService = cofferService;
 
             _minefieldService.UserRevived += HandleUserReviveAsync;
             _minefieldService.ArenaStarted += OnArenaStarted;
@@ -42,8 +44,11 @@ namespace Minefield.Services
 
                 Console.WriteLine($"Bot connected as {_client.CurrentUser.Username}");
                 Console.WriteLine($"Populating...");
+
                 foreach (var kv in _client.Guilds)
                 {
+                    await _cofferService.GetOrCreateCofferAsync(kv.Key);
+
                     var memberList = (await kv.Value.GetAllMembersAsync()).ToList();
                     serverCount++;
 
@@ -72,13 +77,21 @@ namespace Minefield.Services
         {
             var user = await _userService.GetOrCreateUserAsync(e.Author.Id, e.Guild.Id, e.Author.Username);
             var channel = await GetMinefieldChannelAsync(e.Guild.Id);
+
             if (e.Author.IsBot || channel == null || e.Message.Channel.Id != channel.Id || user.IsImmune) { return; }
 
+            if (e.Message.Content.Length == 1)
+            {
+                await e.Message.RespondAsync("Low effort message. Try harder.");
+            }
+
             if (e.Message.Content.StartsWith("!"))
+            {
                 return;
+            }
             else
             {
-                _minefieldService.Coffer.Amount += 5;
+                await _cofferService.AddToCofferAmountAsync(e.Guild.Id, 2);
                 user = await _userService.GetOrCreateUserAsync(e.Author.Id, e.Guild.Id, e.Author.Username);
                 RollResult result = await _minefieldService.ProcessMessageAsync(user);
 
@@ -154,7 +167,7 @@ namespace Minefield.Services
             if (user.SacrificeTarget != null) { await _minefieldService.RemoveSacrificeAsync(user, user.SacrificeTarget); }
             if (user.SacrificeProvider != null) { await _minefieldService.RemoveSacrificeAsync(user.SacrificeProvider, user); }
 
-            _minefieldService.Coffer.Amount += user.Currency / 2;
+            await _cofferService.AddToCofferAmountAsync(user.ServerId, user.Currency / 2);
             user.Currency /= 2;
 
             var server = await _client.GetGuildAsync(user.ServerId);
@@ -179,6 +192,7 @@ namespace Minefield.Services
         private async Task HandleUserSacrificeAsync(MinefieldUser user)
         {
             await _minefieldService.RemoveAllUserRelevantPerks(user);
+            await _cofferService.AddToCofferAmountAsync(user.ServerId, user.Currency / 2);
             user.Currency /= 2;
 
             var server = await _client.GetGuildAsync(user.ServerId);

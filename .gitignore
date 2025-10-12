@@ -419,3 +419,4 @@ FodyWeavers.xsd
 /minefield.db
 /minefield.db-shm
 /minefield.db-wal
+/Entities/Vault.cs

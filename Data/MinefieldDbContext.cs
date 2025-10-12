@@ -8,6 +8,8 @@ namespace Minefield.Data
         public MinefieldDbContext(DbContextOptions<MinefieldDbContext> options) : base(options) { }
 
         public DbSet<MinefieldUser> Users { get; set; } = null!;
+        public DbSet<Coffer> Coffers { get; set; } = null!;
+        public DbSet<CofferTicket> Tickets { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -33,6 +35,17 @@ namespace Minefield.Data
                 .WithOne(u => u.SymbioteProvider)
                 .HasForeignKey<MinefieldUser>(u => new { u.SymbioteTargetId, u.SymbioteTargetServerId })
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Coffer>()
+                .HasKey(c => c.ServerId);
+
+            modelBuilder.Entity<CofferTicket>()
+                .HasKey(ct => new { ct.ServerId, ct.UserId });
+
+            modelBuilder.Entity<CofferTicket>()
+                .HasOne(ct => ct.User)
+                .WithMany(ct => ct.CofferTickets)
+                .HasForeignKey(ct => new { ct.UserId, ct.ServerId });
         }
     }
 }
